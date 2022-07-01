@@ -182,7 +182,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun openVideo(videoUri: Uri) {
         videoUriOriginal = videoUri
-        videoUriStabilized = videoUri
+        videoUriStabilized = null
         videoName = DocumentFile.fromSingleUri(applicationContext, videoUri)?.name ?: ""
         binding.videoOriginal.setVideoURI(videoUriOriginal)
         binding.videoStabilized.setVideoURI(videoUriStabilized)
