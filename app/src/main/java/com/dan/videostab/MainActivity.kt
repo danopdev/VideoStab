@@ -27,6 +27,7 @@ import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
 import com.dan.videostab.databinding.ActivityMainBinding
+import org.opencv.android.OpenCVLoader
 
 
 class MainActivity : AppCompatActivity() {
@@ -105,6 +106,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onPermissionsAllowed() {
+        if (!OpenCVLoader.initDebug()) fatalError("Failed to initialize OpenCV")
+
         BusyDialog.create(this)
 
         binding.videoOriginal.setAudioFocusRequest(AudioManager.AUDIOFOCUS_NONE)
