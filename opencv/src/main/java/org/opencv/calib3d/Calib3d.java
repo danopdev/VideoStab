@@ -10753,6 +10753,38 @@ public class Calib3d {
 
 
     //
+    // C++:  void cv::undistortImagePoints(Mat src, Mat& dst, Mat cameraMatrix, Mat distCoeffs, TermCriteria arg1 = TermCriteria(TermCriteria::MAX_ITER + TermCriteria::EPS, 5, 0.01))
+    //
+
+    /**
+     * Compute undistorted image points position
+     *
+     * @param src Observed points position, 2xN/Nx2 1-channel or 1xN/Nx1 2-channel (CV_32FC2 or
+     * CV_64FC2) (or vector&lt;Point2f&gt; ).
+     * @param dst Output undistorted points position (1xN/Nx1 2-channel or vector&lt;Point2f&gt; ).
+     * @param cameraMatrix Camera matrix \(\vecthreethree{f_x}{0}{c_x}{0}{f_y}{c_y}{0}{0}{1}\) .
+     * @param distCoeffs Distortion coefficients
+     * @param arg1 automatically generated
+     */
+    public static void undistortImagePoints(Mat src, Mat dst, Mat cameraMatrix, Mat distCoeffs, TermCriteria arg1) {
+        undistortImagePoints_0(src.nativeObj, dst.nativeObj, cameraMatrix.nativeObj, distCoeffs.nativeObj, arg1.type, arg1.maxCount, arg1.epsilon);
+    }
+
+    /**
+     * Compute undistorted image points position
+     *
+     * @param src Observed points position, 2xN/Nx2 1-channel or 1xN/Nx1 2-channel (CV_32FC2 or
+     * CV_64FC2) (or vector&lt;Point2f&gt; ).
+     * @param dst Output undistorted points position (1xN/Nx1 2-channel or vector&lt;Point2f&gt; ).
+     * @param cameraMatrix Camera matrix \(\vecthreethree{f_x}{0}{c_x}{0}{f_y}{c_y}{0}{0}{1}\) .
+     * @param distCoeffs Distortion coefficients
+     */
+    public static void undistortImagePoints(Mat src, Mat dst, Mat cameraMatrix, Mat distCoeffs) {
+        undistortImagePoints_1(src.nativeObj, dst.nativeObj, cameraMatrix.nativeObj, distCoeffs.nativeObj);
+    }
+
+
+    //
     // C++:  void cv::fisheye::projectPoints(Mat objectPoints, Mat& imagePoints, Mat rvec, Mat tvec, Mat K, Mat D, double alpha = 0, Mat& jacobian = Mat())
     //
 
@@ -10784,8 +10816,7 @@ public class Calib3d {
      *     @param distorted Output array of image points, 1xN/Nx1 2-channel, or vector&lt;Point2f&gt; .
      *
      *     Note that the function assumes the camera intrinsic matrix of the undistorted points to be identity.
-     *     This means if you want to transform back points undistorted with #fisheye::undistortPoints you have to
-     *     multiply them with \(P^{-1}\).
+     *     This means if you want to distort image points you have to multiply them with \(K^{-1}\).
      */
     public static void fisheye_distortPoints(Mat undistorted, Mat distorted, Mat K, Mat D, double alpha) {
         fisheye_distortPoints_0(undistorted.nativeObj, distorted.nativeObj, K.nativeObj, D.nativeObj, alpha);
@@ -10801,8 +10832,7 @@ public class Calib3d {
      *     @param distorted Output array of image points, 1xN/Nx1 2-channel, or vector&lt;Point2f&gt; .
      *
      *     Note that the function assumes the camera intrinsic matrix of the undistorted points to be identity.
-     *     This means if you want to transform back points undistorted with #fisheye::undistortPoints you have to
-     *     multiply them with \(P^{-1}\).
+     *     This means if you want to distort image points you have to multiply them with \(K^{-1}\).
      */
     public static void fisheye_distortPoints(Mat undistorted, Mat distorted, Mat K, Mat D) {
         fisheye_distortPoints_1(undistorted.nativeObj, distorted.nativeObj, K.nativeObj, D.nativeObj);
@@ -10810,8 +10840,25 @@ public class Calib3d {
 
 
     //
-    // C++:  void cv::fisheye::undistortPoints(Mat distorted, Mat& undistorted, Mat K, Mat D, Mat R = Mat(), Mat P = Mat())
+    // C++:  void cv::fisheye::undistortPoints(Mat distorted, Mat& undistorted, Mat K, Mat D, Mat R = Mat(), Mat P = Mat(), TermCriteria criteria = TermCriteria(TermCriteria::MAX_ITER + TermCriteria::EPS, 10, 1e-8))
     //
+
+    /**
+     * Undistorts 2D points using fisheye model
+     *
+     *     @param distorted Array of object points, 1xN/Nx1 2-channel (or vector&lt;Point2f&gt; ), where N is the
+     *     number of points in the view.
+     *     @param K Camera intrinsic matrix \(cameramatrix{K}\).
+     *     @param D Input vector of distortion coefficients \(\distcoeffsfisheye\).
+     *     @param R Rectification transformation in the object space: 3x3 1-channel, or vector: 3x1/1x3
+     *     1-channel or 1x1 3-channel
+     *     @param P New camera intrinsic matrix (3x3) or new projection matrix (3x4)
+     *     @param criteria Termination criteria
+     *     @param undistorted Output array of image points, 1xN/Nx1 2-channel, or vector&lt;Point2f&gt; .
+     */
+    public static void fisheye_undistortPoints(Mat distorted, Mat undistorted, Mat K, Mat D, Mat R, Mat P, TermCriteria criteria) {
+        fisheye_undistortPoints_0(distorted.nativeObj, undistorted.nativeObj, K.nativeObj, D.nativeObj, R.nativeObj, P.nativeObj, criteria.type, criteria.maxCount, criteria.epsilon);
+    }
 
     /**
      * Undistorts 2D points using fisheye model
@@ -10826,7 +10873,7 @@ public class Calib3d {
      *     @param undistorted Output array of image points, 1xN/Nx1 2-channel, or vector&lt;Point2f&gt; .
      */
     public static void fisheye_undistortPoints(Mat distorted, Mat undistorted, Mat K, Mat D, Mat R, Mat P) {
-        fisheye_undistortPoints_0(distorted.nativeObj, undistorted.nativeObj, K.nativeObj, D.nativeObj, R.nativeObj, P.nativeObj);
+        fisheye_undistortPoints_1(distorted.nativeObj, undistorted.nativeObj, K.nativeObj, D.nativeObj, R.nativeObj, P.nativeObj);
     }
 
     /**
@@ -10841,7 +10888,7 @@ public class Calib3d {
      *     @param undistorted Output array of image points, 1xN/Nx1 2-channel, or vector&lt;Point2f&gt; .
      */
     public static void fisheye_undistortPoints(Mat distorted, Mat undistorted, Mat K, Mat D, Mat R) {
-        fisheye_undistortPoints_1(distorted.nativeObj, undistorted.nativeObj, K.nativeObj, D.nativeObj, R.nativeObj);
+        fisheye_undistortPoints_2(distorted.nativeObj, undistorted.nativeObj, K.nativeObj, D.nativeObj, R.nativeObj);
     }
 
     /**
@@ -10855,7 +10902,7 @@ public class Calib3d {
      *     @param undistorted Output array of image points, 1xN/Nx1 2-channel, or vector&lt;Point2f&gt; .
      */
     public static void fisheye_undistortPoints(Mat distorted, Mat undistorted, Mat K, Mat D) {
-        fisheye_undistortPoints_2(distorted.nativeObj, undistorted.nativeObj, K.nativeObj, D.nativeObj);
+        fisheye_undistortPoints_3(distorted.nativeObj, undistorted.nativeObj, K.nativeObj, D.nativeObj);
     }
 
 
@@ -11090,7 +11137,7 @@ public class Calib3d {
     //
 
     /**
-     * Performs camera calibaration
+     * Performs camera calibration
      *
      *     @param objectPoints vector of vectors of calibration pattern points in the calibration pattern
      *     coordinate space.
@@ -11156,7 +11203,7 @@ public class Calib3d {
     }
 
     /**
-     * Performs camera calibaration
+     * Performs camera calibration
      *
      *     @param objectPoints vector of vectors of calibration pattern points in the calibration pattern
      *     coordinate space.
@@ -11221,7 +11268,7 @@ public class Calib3d {
     }
 
     /**
-     * Performs camera calibaration
+     * Performs camera calibration
      *
      *     @param objectPoints vector of vectors of calibration pattern points in the calibration pattern
      *     coordinate space.
@@ -11945,6 +11992,10 @@ public class Calib3d {
     // C++:  void cv::undistortPoints(Mat src, Mat& dst, Mat cameraMatrix, Mat distCoeffs, Mat R, Mat P, TermCriteria criteria)
     private static native void undistortPointsIter_0(long src_nativeObj, long dst_nativeObj, long cameraMatrix_nativeObj, long distCoeffs_nativeObj, long R_nativeObj, long P_nativeObj, int criteria_type, int criteria_maxCount, double criteria_epsilon);
 
+    // C++:  void cv::undistortImagePoints(Mat src, Mat& dst, Mat cameraMatrix, Mat distCoeffs, TermCriteria arg1 = TermCriteria(TermCriteria::MAX_ITER + TermCriteria::EPS, 5, 0.01))
+    private static native void undistortImagePoints_0(long src_nativeObj, long dst_nativeObj, long cameraMatrix_nativeObj, long distCoeffs_nativeObj, int arg1_type, int arg1_maxCount, double arg1_epsilon);
+    private static native void undistortImagePoints_1(long src_nativeObj, long dst_nativeObj, long cameraMatrix_nativeObj, long distCoeffs_nativeObj);
+
     // C++:  void cv::fisheye::projectPoints(Mat objectPoints, Mat& imagePoints, Mat rvec, Mat tvec, Mat K, Mat D, double alpha = 0, Mat& jacobian = Mat())
     private static native void fisheye_projectPoints_0(long objectPoints_nativeObj, long imagePoints_nativeObj, long rvec_nativeObj, long tvec_nativeObj, long K_nativeObj, long D_nativeObj, double alpha, long jacobian_nativeObj);
     private static native void fisheye_projectPoints_1(long objectPoints_nativeObj, long imagePoints_nativeObj, long rvec_nativeObj, long tvec_nativeObj, long K_nativeObj, long D_nativeObj, double alpha);
@@ -11954,10 +12005,11 @@ public class Calib3d {
     private static native void fisheye_distortPoints_0(long undistorted_nativeObj, long distorted_nativeObj, long K_nativeObj, long D_nativeObj, double alpha);
     private static native void fisheye_distortPoints_1(long undistorted_nativeObj, long distorted_nativeObj, long K_nativeObj, long D_nativeObj);
 
-    // C++:  void cv::fisheye::undistortPoints(Mat distorted, Mat& undistorted, Mat K, Mat D, Mat R = Mat(), Mat P = Mat())
-    private static native void fisheye_undistortPoints_0(long distorted_nativeObj, long undistorted_nativeObj, long K_nativeObj, long D_nativeObj, long R_nativeObj, long P_nativeObj);
-    private static native void fisheye_undistortPoints_1(long distorted_nativeObj, long undistorted_nativeObj, long K_nativeObj, long D_nativeObj, long R_nativeObj);
-    private static native void fisheye_undistortPoints_2(long distorted_nativeObj, long undistorted_nativeObj, long K_nativeObj, long D_nativeObj);
+    // C++:  void cv::fisheye::undistortPoints(Mat distorted, Mat& undistorted, Mat K, Mat D, Mat R = Mat(), Mat P = Mat(), TermCriteria criteria = TermCriteria(TermCriteria::MAX_ITER + TermCriteria::EPS, 10, 1e-8))
+    private static native void fisheye_undistortPoints_0(long distorted_nativeObj, long undistorted_nativeObj, long K_nativeObj, long D_nativeObj, long R_nativeObj, long P_nativeObj, int criteria_type, int criteria_maxCount, double criteria_epsilon);
+    private static native void fisheye_undistortPoints_1(long distorted_nativeObj, long undistorted_nativeObj, long K_nativeObj, long D_nativeObj, long R_nativeObj, long P_nativeObj);
+    private static native void fisheye_undistortPoints_2(long distorted_nativeObj, long undistorted_nativeObj, long K_nativeObj, long D_nativeObj, long R_nativeObj);
+    private static native void fisheye_undistortPoints_3(long distorted_nativeObj, long undistorted_nativeObj, long K_nativeObj, long D_nativeObj);
 
     // C++:  void cv::fisheye::initUndistortRectifyMap(Mat K, Mat D, Mat R, Mat P, Size size, int m1type, Mat& map1, Mat& map2)
     private static native void fisheye_initUndistortRectifyMap_0(long K_nativeObj, long D_nativeObj, long R_nativeObj, long P_nativeObj, double size_width, double size_height, int m1type, long map1_nativeObj, long map2_nativeObj);

@@ -16,11 +16,11 @@ import org.opencv.utils.Converters;
 
 public class Core {
     // these constants are wrapped inside functions to prevent inlining
-    private static String getVersion() { return "4.5.5-dev"; }
-    private static String getNativeLibraryName() { return "opencv_java455"; }
+    private static String getVersion() { return "4.6.0-dev"; }
+    private static String getNativeLibraryName() { return "opencv_java460"; }
     private static int getVersionMajorJ() { return 4; }
-    private static int getVersionMinorJ() { return 5; }
-    private static int getVersionRevisionJ() { return 5; }
+    private static int getVersionMinorJ() { return 6; }
+    private static int getVersionRevisionJ() { return 0; }
     private static String getVersionStatusJ() { return "-dev"; }
 
     public static final String VERSION = getVersion();
@@ -3440,6 +3440,25 @@ public class Core {
 
 
     //
+    // C++:  void cv::transposeND(Mat src, vector_int order, Mat& dst)
+    //
+
+    /**
+     * Transpose for n-dimensional matrices.
+     *
+     * <b>Note:</b> Input should be continuous single-channel matrix.
+     * @param src input array.
+     * @param order a permutation of [0,1,..,N-1] where N is the number of axes of src.
+     * The i’th axis of dst will correspond to the axis numbered order[i] of the input.
+     * @param dst output array of the same type as src.
+     */
+    public static void transposeND(Mat src, MatOfInt order, Mat dst) {
+        Mat order_mat = order;
+        transposeND_0(src.nativeObj, order_mat.nativeObj, dst.nativeObj);
+    }
+
+
+    //
     // C++:  void cv::transform(Mat src, Mat& dst, Mat m)
     //
 
@@ -6046,6 +6065,9 @@ public static MinMaxLocResult minMaxLoc(Mat src) {
 
     // C++:  void cv::transpose(Mat src, Mat& dst)
     private static native void transpose_0(long src_nativeObj, long dst_nativeObj);
+
+    // C++:  void cv::transposeND(Mat src, vector_int order, Mat& dst)
+    private static native void transposeND_0(long src_nativeObj, long order_mat_nativeObj, long dst_nativeObj);
 
     // C++:  void cv::transform(Mat src, Mat& dst, Mat m)
     private static native void transform_0(long src_nativeObj, long dst_nativeObj, long m_nativeObj);

@@ -22,10 +22,13 @@
 
         <View
             android:id="@+id/divider"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="1dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp"
             android:background="@android:drawable/divider_horizontal_textfield"
-            android:backgroundTint="#282828" />
+            android:backgroundTint="#282828"
+            android:minWidth="100dp" />
 
         <TextView
             android:id="@+id/textBusyMessage"
@@ -33,12 +36,14 @@
             android:layout_height="wrap_content"
             android:text="In progress ..."
             android:textAlignment="center"
-            android:textAppearance="@style/TextAppearance.AppCompat.Large" />
+            android:textAppearance="@style/TextAppearance.AppCompat.Medium" />
 
         <ProgressBar
             android:id="@+id/progressBar"
             android:layout_width="48dp"
             android:layout_height="48dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp"
             android:indeterminate="true"
             android:minWidth="48dp"
             android:minHeight="48dp" />

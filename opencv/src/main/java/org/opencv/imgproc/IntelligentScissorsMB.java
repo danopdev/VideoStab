@@ -206,7 +206,7 @@ public class IntelligentScissorsMB {
     //
 
     /**
-     * Specify custom features of imput image
+     * Specify custom features of input image
      *
      * Customized advanced variant of applyImage() call.
      *
@@ -221,7 +221,7 @@ public class IntelligentScissorsMB {
     }
 
     /**
-     * Specify custom features of imput image
+     * Specify custom features of input image
      *
      * Customized advanced variant of applyImage() call.
      *
