@@ -274,7 +274,7 @@ class MainActivity : AppCompatActivity() {
             frameCounter++
             BusyDialog.show("Analyse frame: $frameCounter")
 
-            cvtColor(frame, frameGray, COLOR_BGR2GRAY);
+            cvtColor(frame, frameGray, COLOR_RGB2GRAY);
 
             if (!prevGray.empty()) {
                 // Detect features in previous frame
@@ -291,7 +291,7 @@ class MainActivity : AppCompatActivity() {
 
                 // Filter only valid points
                 val prevPts2fList = prevPts2f.toList()
-                val framePts2fList = prevPts2f.toList()
+                val framePts2fList = framePts2f.toList()
                 val statusList = status.toList()
 
                 val prevPts2fFilteredList = mutableListOf<Point>()
