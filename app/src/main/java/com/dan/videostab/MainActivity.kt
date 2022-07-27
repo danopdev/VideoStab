@@ -13,6 +13,7 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.AdapterView
 import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -53,7 +54,6 @@ class MainActivity : AppCompatActivity() {
         const val VIEW_MODE_SPLIT_VERTICAL = 3
 
         const val SAVE_FOLDER = "/storage/emulated/0/VideoStab"
-        const val TEMP_INPUT_FILE_NAME = "input.video"
 
         private fun fixBorder(frame: Mat) {
             val t = getRotationMatrix2D(Point(frame.cols() / 2.0, frame.rows() / 2.0), 0.0, 1.04)
@@ -63,8 +63,21 @@ class MainActivity : AppCompatActivity() {
 
     private val binding: ActivityMainBinding by lazy { ActivityMainBinding.inflate(layoutInflater) }
     private var videoUriOriginal: Uri? = null
-    private var videoUriStabilized: Uri? = null
     private var videoName  = ""
+    private var videoProps: VideoProps? = null
+    private var videoTransforms: List<Transform>? = null
+
+    private var menuSave: MenuItem? = null
+    private var menuStabilize: MenuItem? = null
+
+    private val tmpFolder: String
+        get() = applicationContext.cacheDir.absolutePath
+    private val tmpOutputVideo: String
+        get() = "$tmpFolder/tmp_video.avi"
+    private val tmpOutputVideoExists: Boolean
+        get() = File(tmpOutputVideo).exists()
+    private val tmpInputVideo: String
+        get() = "$tmpFolder/input.video"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -138,6 +151,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onPermissionsAllowed() {
+        TmpFiles(tmpFolder).delete()
+
         if (!OpenCVLoader.initDebug()) fatalError("Failed to initialize OpenCV")
 
         BusyDialog.create(this)
@@ -182,12 +197,20 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.app_menu, menu)
+
+        menuStabilize = menu?.findItem(R.id.menuStabilize)
+        menuSave = menu?.findItem(R.id.menuSave)
+
+        updateView()
+
         return true
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when(item.itemId) {
-            R.id.menuOpenVideo -> handleOpenVideo()
+            R.id.menuOpen -> handleOpenVideo()
+            R.id.menuStabilize -> handleStabilize()
+            R.id.menuSave -> handleSave()
         }
 
         return super.onOptionsItemSelected(item)
@@ -217,6 +240,44 @@ class MainActivity : AppCompatActivity() {
         startActivityForResult(intent, INTENT_OPEN_VIDEO)
     }
 
+    private fun handleStabilize() {
+        runAsync("Stabilize") {
+            stabApplyAsync()
+        }
+    }
+
+    private fun handleSave() {
+        runAsync("Save") {
+            saveAsync()
+        }
+    }
+
+    private fun saveAsync() {
+        var success = false
+        val outputPath = getOutputPath()
+
+        try {
+            val inputStream = File(tmpOutputVideo).inputStream()
+            val outputStream = File(outputPath).outputStream()
+            inputStream.copyTo(outputStream)
+            inputStream.close()
+            outputStream.close()
+
+            val values = ContentValues()
+            @Suppress("DEPRECATION")
+            values.put(MediaStore.Images.Media.DATA, outputPath)
+            values.put(MediaStore.Images.Media.MIME_TYPE, "video/avi")
+            contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+
+            success = true
+        } catch (e: Exception) {
+        }
+
+        runOnUiThread {
+            Toast.makeText(applicationContext, if (success) "Saved: $outputPath" else "Failed !", Toast.LENGTH_LONG).show()
+        }
+    }
+
     private fun createOutputFolder() {
         val file = File(SAVE_FOLDER)
         if (!file.exists()) file.mkdirs()
@@ -237,12 +298,13 @@ class MainActivity : AppCompatActivity() {
         return outputFilePath
     }
 
-    private fun copyUriToTempFile(videoUri: Uri): String? {
-        val tmpFilePath = applicationContext.filesDir.absolutePath + "/" + TEMP_INPUT_FILE_NAME
-        val inputStream = contentResolver.openInputStream(videoUri) ?: return null
-        val outputStream = File(tmpFilePath).outputStream()
+    private fun copyUriToTempFile() {
+        val videoUri = this.videoUriOriginal ?: throw FileNotFoundException()
+        val inputStream = contentResolver.openInputStream(videoUri) ?: throw FileNotFoundException()
+        val outputStream = File(tmpInputVideo).outputStream()
         inputStream.copyTo(outputStream)
-        return tmpFilePath
+        outputStream.close()
+        inputStream.close()
     }
 
 
@@ -253,104 +315,116 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private fun stabAnalyze(path: String): Pair<List<Transform>, VideoProps> {
-        val videoInput = openVideoCapture(path)
-        if (!videoInput.isOpened) throw FileNotFoundException()
+    private fun stabAnalyzeAsync() {
+        try {
+            videoProps = null
+            videoTransforms = null
 
-        val transforms = mutableListOf<Transform>()
+            //OpenCV expects a file path not an URI so copy it
+            copyUriToTempFile()
 
-        val videoWidth = videoInput.get(CAP_PROP_FRAME_WIDTH).toInt()
-        val videoHeight = videoInput.get(CAP_PROP_FRAME_HEIGHT).toInt()
-        val videoFrameRate = videoInput.get(CAP_PROP_FPS).toInt()
-        val videoRotation = videoInput.get(CAP_PROP_ORIENTATION_META)
+            val videoInput = openVideoCapture(tmpInputVideo)
+            if (!videoInput.isOpened) return
 
-        var frameCounter = 0
-        val frameGray = Mat()
-        val prevGray = Mat()
-        val lastT = Mat()
-        val frame = Mat()
+            val transforms = mutableListOf<Transform>()
 
-        while(videoInput.read(frame)) {
-            frameCounter++
-            BusyDialog.show("Analyse frame: $frameCounter")
+            val videoWidth = videoInput.get(CAP_PROP_FRAME_WIDTH).toInt()
+            val videoHeight = videoInput.get(CAP_PROP_FRAME_HEIGHT).toInt()
+            val videoFrameRate = videoInput.get(CAP_PROP_FPS).toInt()
+            val videoRotation = videoInput.get(CAP_PROP_ORIENTATION_META)
 
-            cvtColor(frame, frameGray, COLOR_RGB2GRAY);
+            var frameCounter = 0
+            val frameGray = Mat()
+            val prevGray = Mat()
+            val lastT = Mat()
+            val frame = Mat()
 
-            if (!prevGray.empty()) {
-                // Detect features in previous frame
-                val prevPts = MatOfPoint()
-                goodFeaturesToTrack(prevGray, prevPts, 200, 0.01, 30.0);
+            while(videoInput.read(frame)) {
+                frameCounter++
+                BusyDialog.show("Analyse frame: $frameCounter")
 
-                // Calculate optical flow (i.e. track feature points)
-                val prevPts2f = MatOfPoint2f()
-                prevPts2f.fromList(prevPts.toList())
-                val framePts2f = MatOfPoint2f()
-                val status = MatOfByte()
-                val err = MatOfFloat()
-                calcOpticalFlowPyrLK(prevGray, frameGray, prevPts2f, framePts2f, status, err)
+                cvtColor(frame, frameGray, COLOR_RGB2GRAY)
 
-                // Filter only valid points
-                val prevPts2fList = prevPts2f.toList()
-                val framePts2fList = framePts2f.toList()
-                val statusList = status.toList()
+                if (!prevGray.empty()) {
+                    // Detect features in previous frame
+                    val prevPts = MatOfPoint()
+                    goodFeaturesToTrack(prevGray, prevPts, 200, 0.01, 30.0)
 
-                val prevPts2fFilteredList = mutableListOf<Point>()
-                val framePts2fFilteredList = mutableListOf<Point>()
+                    // Calculate optical flow (i.e. track feature points)
+                    val prevPts2f = MatOfPoint2f()
+                    prevPts2f.fromList(prevPts.toList())
+                    val framePts2f = MatOfPoint2f()
+                    val status = MatOfByte()
+                    val err = MatOfFloat()
+                    calcOpticalFlowPyrLK(prevGray, frameGray, prevPts2f, framePts2f, status, err)
 
-                for( i in prevPts2fList.indices ) {
-                    if (0.toByte() != statusList[i]) {
-                        prevPts2fFilteredList.add(prevPts2fList[i])
-                        framePts2fFilteredList.add(framePts2fList[i])
+                    // Filter only valid points
+                    val prevPts2fList = prevPts2f.toList()
+                    val framePts2fList = framePts2f.toList()
+                    val statusList = status.toList()
+
+                    val prevPts2fFilteredList = mutableListOf<Point>()
+                    val framePts2fFilteredList = mutableListOf<Point>()
+
+                    for( i in prevPts2fList.indices ) {
+                        if (0.toByte() != statusList[i]) {
+                            prevPts2fFilteredList.add(prevPts2fList[i])
+                            framePts2fFilteredList.add(framePts2fList[i])
+                        }
                     }
+
+                    // Find transformation matrix
+                    val prevPtsMat = MatOfPoint2f()
+                    val framePtsMat = MatOfPoint2f()
+
+                    prevPtsMat.fromList(prevPts2fFilteredList)
+                    framePtsMat.fromList(framePts2fFilteredList)
+
+                    val t: Mat = estimateAffinePartial2D(prevPtsMat, framePtsMat)
+
+                    // In rare cases no transform is found.
+                    // We'll just use the last known good transform.
+                    if(t.empty()) {
+                        lastT.copyTo(t)
+                    } else {
+                        t.copyTo(lastT)
+                    }
+
+                    // Extract translation
+                    val dx = t.get(0, 2)[0]
+                    val dy = t.get(1, 2)[0]
+
+                    // Extract rotation angle
+                    val da = atan2(t.get(1, 0)[0], t.get(0, 0)[0])
+
+                    // Store transformation
+                    transforms.add(Transform(dx, dy, da))
                 }
 
-                // Find transformation matrix
-                val prevPtsMat = MatOfPoint2f()
-                val framePtsMat = MatOfPoint2f()
-
-                prevPtsMat.fromList(prevPts2fFilteredList)
-                framePtsMat.fromList(framePts2fFilteredList)
-
-                val t: Mat = estimateAffinePartial2D(prevPtsMat, framePtsMat)
-
-                // In rare cases no transform is found.
-                // We'll just use the last known good transform.
-                if(t.empty()) {
-                    lastT.copyTo(t)
-                } else {
-                    t.copyTo(lastT);
-                }
-
-                // Extract traslation
-                val dx = t.get(0, 2)[0]
-                val dy = t.get(1, 2)[0]
-
-                // Extract rotation angle
-                val da = atan2(t.get(1, 0)[0], t.get(0, 0)[0])
-
-                // Store transformation
-                transforms.add(Transform(dx, dy, da));
+                frameGray.copyTo(prevGray)
             }
 
-            frameGray.copyTo(prevGray)
+            videoInput.release()
+
+            videoProps = VideoProps(
+                    videoWidth,
+                    videoHeight,
+                    videoFrameRate,
+                    videoRotation.toInt(),
+                    frameCounter
+            )
+            videoTransforms = transforms.toList()
+        } catch (e: Exception) {
         }
-
-        videoInput.release()
-
-        return Pair(
-                transforms.toList(),
-                VideoProps(
-                        videoWidth,
-                        videoHeight,
-                        videoFrameRate,
-                        videoRotation.toInt(),
-                        frameCounter
-                )
-        )
     }
 
-    private fun stabApply(inputPath: String, outputPath: String, transforms: List<Transform>, videoParams: VideoProps): Boolean {
+    private fun stabApplyAsync() {
         BusyDialog.show("Smooth movements")
+
+        val transforms = videoTransforms ?: return
+        val videoProps = this.videoProps ?: return
+
+        TmpFiles(tmpFolder).delete("tmp_")
 
         // Compute trajectory using cumulative sum of transformations
         val trajectory = transforms.cumsum()
@@ -376,19 +450,19 @@ class MainActivity : AppCompatActivity() {
         val t = Mat(2, 3, CV_64F)
         val frameStabilized = Mat()
 
-        val videoInput = openVideoCapture(inputPath)
+        val videoInput = openVideoCapture(tmpInputVideo)
         if (!videoInput.isOpened) throw FileNotFoundException()
 
         val videoOutput = VideoWriter(
-                outputPath,
+                tmpOutputVideo,
                 VideoWriter.fourcc('M','J','P','G'),
-                videoParams.frameRate.toDouble(),
-                Size( videoParams.width.toDouble(), videoParams.height.toDouble() )
+                videoProps.frameRate.toDouble(),
+                Size( videoProps.width.toDouble(), videoProps.height.toDouble() )
         )
 
         if (!videoOutput.isOpened) {
             videoInput.release()
-            throw FileNotFoundException(outputPath)
+            throw FileNotFoundException(tmpOutputVideo)
         }
 
         var frameIndex = 0
@@ -397,7 +471,7 @@ class MainActivity : AppCompatActivity() {
             if (!videoInput.read(frame)) break
 
             frameIndex++
-            BusyDialog.show("Stabilize frame $frameIndex / ${videoParams.frameCount}")
+            BusyDialog.show("Stabilize frame $frameIndex / ${videoProps.frameCount}")
 
             // Extract transform from translation and rotation angle.
             transform.getTransform(t)
@@ -413,77 +487,42 @@ class MainActivity : AppCompatActivity() {
 
         videoOutput.release()
         videoInput.release()
-
-        return true
     }
 
-    private fun stabVideoAsync(videoUri: Uri) {
-        var success = false
-        val destFile = getOutputPath()
-
-        BusyDialog.show("Prepare")
-
-        try {
-            //OpenCV expects a file path not an URI so copy it
-            val tmpFile = copyUriToTempFile(videoUri) ?: throw FileNotFoundException()
-
-            BusyDialog.show("Stabilize")
-            val (transforms, videoProps) = stabAnalyze(tmpFile)
-
-            if (transforms.isNotEmpty()) {
-                success = stabApply(tmpFile, destFile, transforms, videoProps)
-            }
-
-            File(tmpFile).delete()
-        } catch (e: Exception) {
-        }
-
-        runOnUiThread {
-            BusyDialog.dismiss()
-
-            videoUriStabilized = null
-            if (success) {
-                videoUriStabilized = File(destFile).toUri()
-
-                val values = ContentValues()
-                @Suppress("DEPRECATION")
-                values.put(MediaStore.Images.Media.DATA, destFile)
-                values.put(MediaStore.Images.Media.MIME_TYPE, "video/avi")
-                contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-
-            }
-
-            binding.videoStabilized.setVideoURI(videoUriStabilized)
-            updateView()
-        }
-    }
-
-    private fun stabVideo() {
-        videoUriStabilized = null
-        val videoUriOriginal = this.videoUriOriginal ?: return
-
+    private fun runAsync( initialMessage: String, asyncTask: ()->Unit ) {
         videoStop()
 
         GlobalScope.launch(Dispatchers.Default) {
-            stabVideoAsync(videoUriOriginal)
+            BusyDialog.show(initialMessage)
+            asyncTask()
+            runOnUiThread() {
+                updateView()
+                BusyDialog.dismiss()
+            }
         }
     }
 
     private fun openVideo(videoUri: Uri) {
+        TmpFiles(tmpFolder).delete()
+        videoProps = null
+        videoTransforms = null
         videoUriOriginal = videoUri
         videoName = (DocumentFile.fromSingleUri(applicationContext, videoUri)?.name ?: "").split('.')[0]
         binding.videoOriginal.setVideoURI(videoUriOriginal)
-        binding.videoStabilized.setVideoURI(null)
-        stabVideo()
         updateView()
+        runAsync("Prepare") { stabAnalyzeAsync() }
     }
 
     private fun updateView() {
-        if (null == videoUriStabilized) {
+        if (!tmpOutputVideoExists) {
+            binding.videoStabilized.setVideoURI(null)
             binding.layoutViewMode.visibility = View.GONE
             binding.layoutOriginal.visibility = View.VISIBLE
             binding.layoutStabilized.visibility = View.GONE
+            menuSave?.isEnabled = false
+            menuStabilize?.isEnabled = videoTransforms != null
         } else {
+            binding.videoStabilized.setVideoURI(File(tmpOutputVideo).toUri())
             binding.layoutViewMode.visibility = View.VISIBLE
 
             when (binding.viewMode.selectedItemPosition) {
@@ -501,6 +540,9 @@ class MainActivity : AppCompatActivity() {
                     binding.layoutStabilized.visibility = View.VISIBLE
                 }
             }
+
+            menuSave?.isEnabled = true
+            menuStabilize?.isEnabled = true
         }
 
         val originalAvailable = null != videoUriOriginal

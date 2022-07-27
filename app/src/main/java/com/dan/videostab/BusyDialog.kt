@@ -1,6 +1,7 @@
 package com.dan.videostab
 
 import android.os.Bundle
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -19,8 +20,18 @@ class BusyDialog( private var message: String): DialogFragment() {
             activity = activity_
         }
 
+        private fun runSafe( callback: ()->Unit ) {
+            if (Looper.getMainLooper().isCurrentThread) {
+                callback()
+            } else {
+                activity.runOnUiThread {
+                    callback()
+                }
+            }
+        }
+
         fun show(message: String) {
-            activity.runOnUiThread {
+            runSafe {
                 if (null == currentDialog) {
                     val dialog = BusyDialog(message)
                     dialog.isCancelable = false
@@ -33,7 +44,7 @@ class BusyDialog( private var message: String): DialogFragment() {
         }
 
         fun dismiss() {
-            activity.runOnUiThread {
+            runSafe {
                 currentDialog?.dismiss()
                 currentDialog = null
             }
@@ -42,7 +53,7 @@ class BusyDialog( private var message: String): DialogFragment() {
 
     private var binding: BusyDialogBinding? = null
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val binding = BusyDialogBinding.inflate( inflater )
         binding.textBusyMessage.text = message
         this.binding = binding

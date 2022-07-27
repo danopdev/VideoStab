@@ -8,33 +8,15 @@
         android:layout_margin="10dp"
         android:background="#B3FFFFFF"
         android:gravity="center"
+        android:minWidth="300dp"
         android:orientation="vertical"
         android:padding="16dp">
-
-        <TextView
-            android:id="@+id/textView4"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Please Wait"
-            android:textAlignment="textStart"
-            android:textAppearance="@style/TextAppearance.AppCompat.Large"
-            android:textStyle="bold" />
-
-        <View
-            android:id="@+id/divider"
-            android:layout_width="wrap_content"
-            android:layout_height="1dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="8dp"
-            android:background="@android:drawable/divider_horizontal_textfield"
-            android:backgroundTint="#282828"
-            android:minWidth="100dp" />
 
         <TextView
             android:id="@+id/textBusyMessage"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="In progress ..."
+            android:text="Please wait ..."
             android:textAlignment="center"
             android:textAppearance="@style/TextAppearance.AppCompat.Medium" />
 
