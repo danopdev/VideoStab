@@ -467,22 +467,29 @@ class MainActivity : AppCompatActivity() {
 
         var frameIndex = 0
         val frame = Mat()
-        for (transform in transformsSmooth) {
-            if (!videoInput.read(frame)) break
-
+        
+        if (videoInput.read(frame)) {
             frameIndex++
             BusyDialog.show("Stabilize frame $frameIndex / ${videoProps.frameCount}")
+            videoOutput.write(frameStabilized)
 
-            // Extract transform from translation and rotation angle.
-            transform.getTransform(t)
+            for (transform in transformsSmooth) {
+                if (!videoInput.read(frame)) break
 
-            // Apply affine wrapping to the given frame
-            warpAffine(frame, frameStabilized, t, frame.size())
+                frameIndex++
+                BusyDialog.show("Stabilize frame $frameIndex / ${videoProps.frameCount}")
 
-            // Scale image to remove black border artifact
-            fixBorder(frameStabilized)
+                // Extract transform from translation and rotation angle.
+                transform.getTransform(t)
 
-            videoOutput.write( frameStabilized )
+                // Apply affine wrapping to the given frame
+                warpAffine(frame, frameStabilized, t, frame.size())
+
+                // Scale image to remove black border artifact
+                fixBorder(frameStabilized)
+
+                videoOutput.write(frameStabilized)
+            }
         }
 
         videoOutput.release()
