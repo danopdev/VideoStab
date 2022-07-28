@@ -20,6 +20,8 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
+import com.arthenica.ffmpegkit.FFmpegKit
+import com.arthenica.ffmpegkit.ReturnCode
 import com.dan.videostab.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -74,6 +76,8 @@ class MainActivity : AppCompatActivity() {
         get() = applicationContext.cacheDir.absolutePath
     private val tmpOutputVideo: String
         get() = "$tmpFolder/tmp_video.avi"
+    private val tmpOutputVideoIntermediate: String
+        get() = "$tmpFolder/tmp_video_intermediate.avi"
     private val tmpOutputVideoExists: Boolean
         get() = File(tmpOutputVideo).exists()
     private val tmpInputVideo: String
@@ -263,11 +267,13 @@ class MainActivity : AppCompatActivity() {
             inputStream.close()
             outputStream.close()
 
+            /*
             val values = ContentValues()
             @Suppress("DEPRECATION")
             values.put(MediaStore.Images.Media.DATA, outputPath)
-            values.put(MediaStore.Images.Media.MIME_TYPE, "video/avi")
+            //values.put(MediaStore.Images.Media.MIME_TYPE, "video/mp4")
             contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+             */
 
             success = true
         } catch (e: Exception) {
@@ -290,7 +296,7 @@ class MainActivity : AppCompatActivity() {
         var counter = 0
 
         while(counter < 999) {
-            outputFilePath = SAVE_FOLDER + "/" + videoName + (if (0 == counter) "" else "_${String.format("%03d", counter)}") + ".avi"
+            outputFilePath = SAVE_FOLDER + "/" + videoName + (if (0 == counter) "" else "_${String.format("%03d", counter)}") + ".mp4"
             if (!File(outputFilePath).exists()) break
             counter++
         }
@@ -454,7 +460,7 @@ class MainActivity : AppCompatActivity() {
         if (!videoInput.isOpened) throw FileNotFoundException()
 
         val videoOutput = VideoWriter(
-                tmpOutputVideo,
+                tmpOutputVideoIntermediate,
                 VideoWriter.fourcc('M','J','P','G'),
                 videoProps.frameRate.toDouble(),
                 Size( videoProps.width.toDouble(), videoProps.height.toDouble() )
@@ -462,16 +468,16 @@ class MainActivity : AppCompatActivity() {
 
         if (!videoOutput.isOpened) {
             videoInput.release()
-            throw FileNotFoundException(tmpOutputVideo)
+            throw FileNotFoundException(tmpOutputVideoIntermediate)
         }
 
         var frameIndex = 0
         val frame = Mat()
-        
+
         if (videoInput.read(frame)) {
             frameIndex++
             BusyDialog.show("Stabilize frame $frameIndex / ${videoProps.frameCount}")
-            videoOutput.write(frameStabilized)
+            videoOutput.write(frame)
 
             for (transform in transformsSmooth) {
                 if (!videoInput.read(frame)) break
@@ -494,9 +500,27 @@ class MainActivity : AppCompatActivity() {
 
         videoOutput.release()
         videoInput.release()
+
+        BusyDialog.show("Create video")
+
+        val ffmpegParams = listOf(
+                "-y",
+                "-i $tmpOutputVideoIntermediate",
+                "-vcodec mpeg4",
+                "-q:v 2",
+                tmpOutputVideo
+        ).joinToString(" ")
+        val session = FFmpegKit.execute(ffmpegParams)
+        val output = session.output
+
+        if (ReturnCode.isSuccess(session.returnCode)) {
+            File(tmpOutputVideoIntermediate).delete()
+        } else {
+            TmpFiles(tmpFolder).delete("tmp_")
+        }
     }
 
-    private fun runAsync( initialMessage: String, asyncTask: ()->Unit ) {
+    private fun runAsync(initialMessage: String, asyncTask: () -> Unit) {
         videoStop()
 
         GlobalScope.launch(Dispatchers.Default) {
