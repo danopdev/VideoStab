@@ -88,9 +88,9 @@ class MainActivity : AppCompatActivity() {
     private val tmpFolder: String
         get() = applicationContext.cacheDir.absolutePath
     private val tmpOutputVideo: String
-        get() = "$tmpFolder/tmp_video.avi"
+        get() = "$tmpFolder/tmp_video.mp4"
     private val tmpOutputVideoIntermediate: String
-        get() = "$tmpFolder/tmp_video_intermediate.avi"
+        get() = "$tmpFolder/tmp_video_intermediate.mp4"
     private val tmpOutputVideoExists: Boolean
         get() = File(tmpOutputVideo).exists()
     private val tmpInputVideo: String
@@ -496,6 +496,12 @@ class MainActivity : AppCompatActivity() {
 
         TmpFiles(tmpFolder).delete("tmp_")
 
+        var outputFrameRate: Int = videoProps.frameRate
+        try {
+            outputFrameRate = (binding.fps.selectedItem as String).toInt()
+        } catch (e: Exception) {
+        }
+
         val movingAverageWindowSize = videoProps.frameRate * (binding.seekBarStrength.progress + 1)
 
         val newTrajectoryX: List<Double>
@@ -575,21 +581,26 @@ class MainActivity : AppCompatActivity() {
         val videoInput = openVideoCapture(tmpInputVideo)
         if (!videoInput.isOpened) throw FileNotFoundException()
 
+        /*
         val videoOutput = VideoWriter(
                 tmpOutputVideoIntermediate,
                 VideoWriter.fourcc('M','J','P','G'),
-                videoProps.frameRate.toDouble(),
+                outputFrameRate.toDouble(),
                 Size( videoProps.width.toDouble(), videoProps.height.toDouble() )
+        )
+        */
+        val videoOutput = VideoEncoder.create(
+                tmpOutputVideo,
+                outputFrameRate,
+                videoProps.width, videoProps.height
         )
 
         if (!videoOutput.isOpened) {
-            videoInput.release()
             throw FileNotFoundException(tmpOutputVideoIntermediate)
         }
 
         val frame = Mat()
         val frameStabilized = Mat()
-        val frameStabilizedRGB = Mat()
         val t = Mat(2, 3, CV_64F)
 
         for (index in transforms.x.indices) {
@@ -600,37 +611,11 @@ class MainActivity : AppCompatActivity() {
             transforms.getTransform(index, t)
             warpAffine(frame, frameStabilized, t, frame.size())
             fixBorder(frameStabilized, crop)
-            cvtColor(frameStabilized, frameStabilizedRGB, COLOR_BGR2RGB)
-            videoOutput.write(frameStabilizedRGB)
+            videoOutput.write(frameStabilized)
         }
 
         videoOutput.release()
         videoInput.release()
-
-        BusyDialog.show("Create video")
-
-        var outputFrameRate: Int = videoProps.frameRate
-
-        try {
-            outputFrameRate = (binding.fps.selectedItem as String).toInt()
-        } catch (e: Exception) {
-        }
-
-        val ffmpegParams = listOf(
-                "-y",
-                "-i $tmpOutputVideoIntermediate",
-                "-vcodec mpeg4",
-                "-q:v 2",
-                "-r $outputFrameRate",
-                tmpOutputVideo
-        ).joinToString(" ")
-        val session = FFmpegKit.execute(ffmpegParams)
-
-        if (ReturnCode.isSuccess(session.returnCode)) {
-            File(tmpOutputVideoIntermediate).delete()
-        } else {
-            TmpFiles(tmpFolder).delete("tmp_")
-        }
     }
 
     private fun runAsync(initialMessage: String, asyncTask: () -> Unit) {
