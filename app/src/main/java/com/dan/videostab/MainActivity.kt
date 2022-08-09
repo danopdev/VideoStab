@@ -572,9 +572,6 @@ class MainActivity : AppCompatActivity() {
 
         val crop = stabCalculateCrop(transforms, videoProps)
 
-        val t = Mat(2, 3, CV_64F)
-        val frameStabilized = Mat()
-
         val videoInput = openVideoCapture(tmpInputVideo)
         if (!videoInput.isOpened) throw FileNotFoundException()
 
@@ -591,6 +588,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         val frame = Mat()
+        val frameStabilized = Mat()
+        val frameStabilizedRGB = Mat()
+        val t = Mat(2, 3, CV_64F)
 
         for (index in transforms.x.indices) {
             BusyDialog.show("Stabilize frame ${index+1} / ${videoProps.frameCount}")
@@ -600,7 +600,8 @@ class MainActivity : AppCompatActivity() {
             transforms.getTransform(index, t)
             warpAffine(frame, frameStabilized, t, frame.size())
             fixBorder(frameStabilized, crop)
-            videoOutput.write(frameStabilized)
+            cvtColor(frameStabilized, frameStabilizedRGB, COLOR_BGR2RGB)
+            videoOutput.write(frameStabilizedRGB)
         }
 
         videoOutput.release()
