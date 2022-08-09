@@ -38,6 +38,8 @@ import org.opencv.videoio.Videoio.*
 import java.io.File
 import java.io.FileNotFoundException
 import kotlin.math.atan2
+import kotlin.math.max
+import kotlin.math.sin
 
 
 class MainActivity : AppCompatActivity() {
@@ -57,8 +59,8 @@ class MainActivity : AppCompatActivity() {
 
         const val SAVE_FOLDER = "/storage/emulated/0/VideoStab"
 
-        private fun fixBorder(frame: Mat) {
-            val t = getRotationMatrix2D(Point(frame.cols() / 2.0, frame.rows() / 2.0), 0.0, 1.04)
+        private fun fixBorder(frame: Mat, crop: Double) {
+            val t = getRotationMatrix2D(Point(frame.cols() / 2.0, frame.rows() / 2.0), 0.0, 1.0 + crop)
             warpAffine(frame, frame, t, frame.size())
         }
     }
@@ -67,7 +69,7 @@ class MainActivity : AppCompatActivity() {
     private var videoUriOriginal: Uri? = null
     private var videoName  = ""
     private var videoProps: VideoProps? = null
-    private var videoTransforms: List<Transform>? = null
+    private var videoTrajectory: Trajectory? = null
 
     private var menuSave: MenuItem? = null
     private var menuStabilize: MenuItem? = null
@@ -324,7 +326,7 @@ class MainActivity : AppCompatActivity() {
     private fun stabAnalyzeAsync() {
         try {
             videoProps = null
-            videoTransforms = null
+            videoTrajectory = null
 
             //OpenCV expects a file path not an URI so copy it
             copyUriToTempFile()
@@ -332,7 +334,9 @@ class MainActivity : AppCompatActivity() {
             val videoInput = openVideoCapture(tmpInputVideo)
             if (!videoInput.isOpened) return
 
-            val transforms = mutableListOf<Transform>()
+            val trajectory_x = mutableListOf<Double>()
+            val trajectory_y = mutableListOf<Double>()
+            val trajectory_a = mutableListOf<Double>()
 
             val videoWidth = videoInput.get(CAP_PROP_FRAME_WIDTH).toInt()
             val videoHeight = videoInput.get(CAP_PROP_FRAME_HEIGHT).toInt()
@@ -344,6 +348,9 @@ class MainActivity : AppCompatActivity() {
             val prevGray = Mat()
             val lastT = Mat()
             val frame = Mat()
+            var x = 0.0
+            var y = 0.0
+            var a = 0.0
 
             while(videoInput.read(frame)) {
                 frameCounter++
@@ -403,9 +410,14 @@ class MainActivity : AppCompatActivity() {
                     // Extract rotation angle
                     val da = atan2(t.get(1, 0)[0], t.get(0, 0)[0])
 
-                    // Store transformation
-                    transforms.add(Transform(dx, dy, da))
+                    x += dx
+                    y += dy
+                    a += da
                 }
+
+                trajectory_x.add(x)
+                trajectory_y.add(y)
+                trajectory_a.add(a)
 
                 frameGray.copyTo(prevGray)
             }
@@ -419,39 +431,73 @@ class MainActivity : AppCompatActivity() {
                     videoRotation.toInt(),
                     frameCounter
             )
-            videoTransforms = transforms.toList()
+
+            videoTrajectory = Trajectory( trajectory_x.toList(), trajectory_y.toList(), trajectory_a.toList() )
         } catch (e: Exception) {
         }
     }
 
+    private fun stabCalculateCrop( transforms: Trajectory, videoProps: VideoProps ): Double {
+        var crop = 0.0
+
+        for (index in transforms.x.indices) {
+            val dx = transforms.x[index]
+            val dy = transforms.y[index]
+            val da = transforms.a[index]
+
+            var frameCropLeft = 0.0
+            var frameCropRight = 0.0
+            var frameCropTop = 0.0
+            var frameCropBottom = 0.0
+
+            if (dx >= 0) {
+                frameCropLeft = dx
+            } else {
+                frameCropRight = -dx
+            }
+
+            if (dy >= 0) {
+                frameCropTop = dy
+            } else {
+                frameCropBottom = -dy
+            }
+
+            val extra = videoProps.height * sin(da)
+            frameCropTop += extra
+            frameCropBottom += extra
+
+            val frameCropWidth = max(frameCropLeft, frameCropRight) * 2 / videoProps.width
+            val frameCropHeight = max(frameCropTop, frameCropBottom) * 2 / videoProps.height
+            val frameCrop = max(frameCropWidth, frameCropHeight)
+            crop = max(crop, frameCrop)
+        }
+
+        crop += 0.02
+        return crop
+    }
+
+
     private fun stabApplyAsync() {
         BusyDialog.show("Smooth movements")
 
-        val transforms = videoTransforms ?: return
+        val trajectory = videoTrajectory ?: return
         val videoProps = this.videoProps ?: return
 
         TmpFiles(tmpFolder).delete("tmp_")
 
-        // Compute trajectory using cumulative sum of transformations
-        val trajectory = transforms.cumsum()
+        val newTrajectory = Trajectory(
+                trajectory.x.movingAverage(100),
+                trajectory.y.movingAverage(100),
+                trajectory.a.movingAverage(100),
+        )
 
-        // Smooth trajectory using moving average filter
-        val smoothedTrajectory = trajectory.smooth(100)
-        val transformsSmooth = mutableListOf<Transform>()
+        val transforms = Trajectory(
+                trajectory.x.delta( newTrajectory.x ),
+                trajectory.y.delta( newTrajectory.y ),
+                trajectory.a.delta( newTrajectory.a ),
+        )
 
-        for(i in trajectory.indices) {
-            // Calculate difference in smoothed_trajectory and trajectory
-            val diffX = smoothedTrajectory[i].x - trajectory[i].x
-            val diffY = smoothedTrajectory[i].y - trajectory[i].y
-            val diffA = smoothedTrajectory[i].a - trajectory[i].a
-
-            // Calculate newer transformation array
-            val dx = transforms[i].x + diffX
-            val dy = transforms[i].y + diffY
-            val da = transforms[i].a + diffA
-
-            transformsSmooth.add(Transform(dx, dy, da))
-        }
+        val crop = stabCalculateCrop(transforms, videoProps)
 
         val t = Mat(2, 3, CV_64F)
         val frameStabilized = Mat()
@@ -471,31 +517,17 @@ class MainActivity : AppCompatActivity() {
             throw FileNotFoundException(tmpOutputVideoIntermediate)
         }
 
-        var frameIndex = 0
         val frame = Mat()
 
-        if (videoInput.read(frame)) {
-            frameIndex++
-            BusyDialog.show("Stabilize frame $frameIndex / ${videoProps.frameCount}")
-            videoOutput.write(frame)
+        for (index in transforms.x.indices) {
+            BusyDialog.show("Stabilize frame ${index+1} / ${videoProps.frameCount}")
 
-            for (transform in transformsSmooth) {
-                if (!videoInput.read(frame)) break
+            if (!videoInput.read(frame)) break
 
-                frameIndex++
-                BusyDialog.show("Stabilize frame $frameIndex / ${videoProps.frameCount}")
-
-                // Extract transform from translation and rotation angle.
-                transform.getTransform(t)
-
-                // Apply affine wrapping to the given frame
-                warpAffine(frame, frameStabilized, t, frame.size())
-
-                // Scale image to remove black border artifact
-                fixBorder(frameStabilized)
-
-                videoOutput.write(frameStabilized)
-            }
+            transforms.getTransform(index, t)
+            warpAffine(frame, frameStabilized, t, frame.size())
+            fixBorder(frameStabilized, crop)
+            videoOutput.write(frameStabilized)
         }
 
         videoOutput.release()
@@ -511,7 +543,6 @@ class MainActivity : AppCompatActivity() {
                 tmpOutputVideo
         ).joinToString(" ")
         val session = FFmpegKit.execute(ffmpegParams)
-        val output = session.output
 
         if (ReturnCode.isSuccess(session.returnCode)) {
             File(tmpOutputVideoIntermediate).delete()
@@ -536,7 +567,7 @@ class MainActivity : AppCompatActivity() {
     private fun openVideo(videoUri: Uri) {
         TmpFiles(tmpFolder).delete()
         videoProps = null
-        videoTransforms = null
+        videoTrajectory = null
         videoUriOriginal = videoUri
         videoName = (DocumentFile.fromSingleUri(applicationContext, videoUri)?.name ?: "").split('.')[0]
         binding.videoOriginal.setVideoURI(videoUriOriginal)
@@ -551,7 +582,7 @@ class MainActivity : AppCompatActivity() {
             binding.layoutOriginal.visibility = View.VISIBLE
             binding.layoutStabilized.visibility = View.GONE
             menuSave?.isEnabled = false
-            menuStabilize?.isEnabled = videoTransforms != null
+            menuStabilize?.isEnabled = videoTrajectory != null
         } else {
             binding.videoStabilized.setVideoURI(File(tmpOutputVideo).toUri())
             binding.layoutViewMode.visibility = View.VISIBLE
