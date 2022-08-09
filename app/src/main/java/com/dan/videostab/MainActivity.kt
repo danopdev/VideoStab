@@ -57,6 +57,17 @@ class MainActivity : AppCompatActivity() {
         const val VIEW_MODE_SPLIT_HORIZONTAL = 2
         const val VIEW_MODE_SPLIT_VERTICAL = 3
 
+        const val ALGORITHM_GENERIC = 0
+        const val ALGORITHM_GENERIC_B = 1
+        const val ALGORITHM_STILL = 2
+        const val ALGORITHM_HORIZONTAL_PANNING = 3
+        const val ALGORITHM_HORIZONTAL_PANNING_B = 4
+        const val ALGORITHM_VERTICAL_PANNING = 5
+        const val ALGORITHM_VERTICAL_PANNING_B = 6
+        const val ALGORITHM_PANNING = 7
+        const val ALGORITHM_PANNING_B = 8
+        const val ALGORITHM_NO_ROTATION = 9
+
         const val SAVE_FOLDER = "/storage/emulated/0/VideoStab"
 
         private fun fixBorder(frame: Mat, crop: Double) {
@@ -334,9 +345,9 @@ class MainActivity : AppCompatActivity() {
             val videoInput = openVideoCapture(tmpInputVideo)
             if (!videoInput.isOpened) return
 
-            val trajectory_x = mutableListOf<Double>()
-            val trajectory_y = mutableListOf<Double>()
-            val trajectory_a = mutableListOf<Double>()
+            val trajectoryX = mutableListOf<Double>()
+            val trajectoryY = mutableListOf<Double>()
+            val trajectoryA = mutableListOf<Double>()
 
             val videoWidth = videoInput.get(CAP_PROP_FRAME_WIDTH).toInt()
             val videoHeight = videoInput.get(CAP_PROP_FRAME_HEIGHT).toInt()
@@ -415,9 +426,9 @@ class MainActivity : AppCompatActivity() {
                     a += da
                 }
 
-                trajectory_x.add(x)
-                trajectory_y.add(y)
-                trajectory_a.add(a)
+                trajectoryX.add(x)
+                trajectoryY.add(y)
+                trajectoryA.add(a)
 
                 frameGray.copyTo(prevGray)
             }
@@ -432,7 +443,7 @@ class MainActivity : AppCompatActivity() {
                     frameCounter
             )
 
-            videoTrajectory = Trajectory( trajectory_x.toList(), trajectory_y.toList(), trajectory_a.toList() )
+            videoTrajectory = Trajectory( trajectoryX.toList(), trajectoryY.toList(), trajectoryA.toList() )
         } catch (e: Exception) {
         }
     }
@@ -485,16 +496,78 @@ class MainActivity : AppCompatActivity() {
 
         TmpFiles(tmpFolder).delete("tmp_")
 
-        val newTrajectory = Trajectory(
-                trajectory.x.movingAverage(100),
-                trajectory.y.movingAverage(100),
-                trajectory.a.movingAverage(100),
-        )
+        val movingAverageWindowSize = videoProps.frameRate * (binding.seekBarStrength.progress + 1)
+
+        val newTrajectoryX: List<Double>
+        val newTrajectoryY: List<Double>
+        val newTrajectoryA: List<Double>
+
+        when(binding.algorithm.selectedItemPosition) {
+            ALGORITHM_GENERIC_B -> {
+                newTrajectoryX = trajectory.x.movingAverage(movingAverageWindowSize)
+                newTrajectoryY = trajectory.y.movingAverage(movingAverageWindowSize)
+                newTrajectoryA = List(trajectory.size) { 0.0 }
+            }
+
+            ALGORITHM_STILL -> {
+                newTrajectoryX = List(trajectory.size) { 0.0 }
+                newTrajectoryY = newTrajectoryX
+                newTrajectoryA = newTrajectoryX
+            }
+
+            ALGORITHM_HORIZONTAL_PANNING -> {
+                newTrajectoryX = trajectory.x.distribute()
+                newTrajectoryY = List(trajectory.size) { 0.0 }
+                newTrajectoryA = newTrajectoryY
+            }
+
+            ALGORITHM_HORIZONTAL_PANNING_B -> {
+                newTrajectoryX = trajectory.x.distribute()
+                newTrajectoryY = List(trajectory.size) { 0.0 }
+                newTrajectoryA = trajectory.a.movingAverage(movingAverageWindowSize)
+            }
+
+            ALGORITHM_VERTICAL_PANNING -> {
+                newTrajectoryX = List(trajectory.size) { 0.0 }
+                newTrajectoryY = trajectory.y.distribute()
+                newTrajectoryA = newTrajectoryX
+            }
+
+            ALGORITHM_VERTICAL_PANNING_B -> {
+                newTrajectoryX = List(trajectory.size) { 0.0 }
+                newTrajectoryY = trajectory.y.distribute()
+                newTrajectoryA = trajectory.a.movingAverage(movingAverageWindowSize)
+            }
+
+            ALGORITHM_PANNING -> {
+                newTrajectoryX = trajectory.x.distribute()
+                newTrajectoryY = trajectory.y.distribute()
+                newTrajectoryA = List(trajectory.size) { 0.0 }
+            }
+
+            ALGORITHM_PANNING_B -> {
+                newTrajectoryX = trajectory.x.distribute()
+                newTrajectoryY = trajectory.y.distribute()
+                newTrajectoryA = trajectory.a.movingAverage(movingAverageWindowSize)
+            }
+
+            ALGORITHM_NO_ROTATION -> {
+                newTrajectoryX = trajectory.x
+                newTrajectoryY = trajectory.y
+                newTrajectoryA = List(trajectory.size) { 0.0 }
+            }
+
+            else -> {
+                newTrajectoryX = trajectory.x.movingAverage(movingAverageWindowSize)
+                newTrajectoryY = trajectory.y.movingAverage(movingAverageWindowSize)
+                newTrajectoryA = trajectory.a.movingAverage(movingAverageWindowSize)
+            }
+        }
 
         val transforms = Trajectory(
-                trajectory.x.delta( newTrajectory.x ),
-                trajectory.y.delta( newTrajectory.y ),
-                trajectory.a.delta( newTrajectory.a ),
+                trajectory.x.delta( newTrajectoryX ),
+                trajectory.y.delta( newTrajectoryY ),
+                trajectory.a.delta( newTrajectoryA ),
         )
 
         val crop = stabCalculateCrop(transforms, videoProps)
@@ -535,11 +608,19 @@ class MainActivity : AppCompatActivity() {
 
         BusyDialog.show("Create video")
 
+        var outputFrameRate: Int = videoProps.frameRate
+
+        try {
+            outputFrameRate = (binding.fps.selectedItem as String).toInt()
+        } catch (e: Exception) {
+        }
+
         val ffmpegParams = listOf(
                 "-y",
                 "-i $tmpOutputVideoIntermediate",
                 "-vcodec mpeg4",
                 "-q:v 2",
+                "-r $outputFrameRate",
                 tmpOutputVideo
         ).joinToString(" ")
         val session = FFmpegKit.execute(ffmpegParams)
