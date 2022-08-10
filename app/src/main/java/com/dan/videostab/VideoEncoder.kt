@@ -44,6 +44,7 @@ class VideoEncoder(
     }
 
     private val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    private val bitmapRect = Rect(0,0, width, height)
     private var frameIndex = 0
     private var open = true
     private var videoTrackIndex = -1
@@ -94,7 +95,7 @@ class VideoEncoder(
         Utils.matToBitmap(frame, bitmap)
 
         val canvas = surface.lockHardwareCanvas() ?: return
-        canvas.drawBitmap(bitmap, null, Rect(0,0, bitmap.width, bitmap.height), null)
+        canvas.drawBitmap(bitmap, null, bitmapRect, null)
         surface.unlockCanvasAndPost(canvas)
 
         drainEncoder(false)
