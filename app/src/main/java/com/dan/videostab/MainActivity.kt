@@ -277,13 +277,11 @@ class MainActivity : AppCompatActivity() {
             inputStream.close()
             outputStream.close()
 
-            /*
             val values = ContentValues()
             @Suppress("DEPRECATION")
-            values.put(MediaStore.Images.Media.DATA, outputPath)
-            //values.put(MediaStore.Images.Media.MIME_TYPE, "video/mp4")
-            contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-             */
+            values.put(MediaStore.Video.Media.DATA, outputPath)
+            values.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+            contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
 
             success = true
         } catch (e: Exception) {
