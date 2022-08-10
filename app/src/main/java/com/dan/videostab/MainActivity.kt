@@ -20,8 +20,6 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.ReturnCode
 import com.dan.videostab.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -33,7 +31,6 @@ import org.opencv.core.CvType.CV_64F
 import org.opencv.imgproc.Imgproc.*
 import org.opencv.video.Video.calcOpticalFlowPyrLK
 import org.opencv.videoio.VideoCapture
-import org.opencv.videoio.VideoWriter
 import org.opencv.videoio.Videoio.*
 import java.io.File
 import java.io.FileNotFoundException
