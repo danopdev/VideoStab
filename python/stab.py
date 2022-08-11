@@ -115,7 +115,9 @@ def calcDelta(fromValues, toValues):
   return [ toValues[i] - fromValues[i] for i in range(len(fromValues)) ]
 
 
-def calculateTransform( prev_gray, curr_gray, prev_pts ):
+def calculateTransform_goodFeaturesToTrack( prev_gray, curr_gray ):
+  prev_pts = cv2.goodFeaturesToTrack(prev_gray, maxCorners=200, qualityLevel=0.001, minDistance=3, blockSize=3)
+
   # Calculate optical flow (i.e. track feature points)
   curr_pts, status, err = cv2.calcOpticalFlowPyrLK(prev_gray, curr_gray, prev_pts, None)
 
@@ -128,13 +130,25 @@ def calculateTransform( prev_gray, curr_gray, prev_pts ):
   curr_pts = curr_pts[idx]
 
   #Find transformation matrix
-  m, _ = cv2.estimateAffinePartial2D(prev_pts2, curr_pts)
+  m, _ = cv2.estimateAffinePartial2D(prev_pts2, curr_pts, method=cv2.RANSAC)
 
   # Extract traslation
   dx = m[0,2]
   dy = m[1,2]
 
   # Extract rotation angle
+  da = np.arctan2(m[1,0], m[0,0])
+
+  return (dx, dy, da)
+
+
+def calculateTransform_findTransformECC( prev_gray, curr_gray ):
+  m = np.eye(2, 3, dtype=np.float32)
+  criteria = ( cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 50, 0.001 )
+  cv2.findTransformECC( prev_gray, curr_gray, m, cv2.MOTION_EUCLIDEAN, criteria, None, 5 )
+
+  dx = m[0,2]
+  dy = m[1,2]
   da = np.arctan2(m[1,0], m[0,0])
 
   return (dx, dy, da)
@@ -171,8 +185,7 @@ def analyse(input_file):
         break
 
       # Detect feature points in previous frame
-      prev_pts = cv2.goodFeaturesToTrack(prev_gray, maxCorners=200, qualityLevel=0.01, minDistance=30, blockSize=10)
-      dx, dy, da = calculateTransform( prev_gray, frame_gray, prev_pts )
+      dx, dy, da = calculateTransform( prev_gray, frame_gray )
       x += dx
       y += dy
       a += da
@@ -180,7 +193,7 @@ def analyse(input_file):
       position_y.append(y)
       position_a.append(a)
 
-      print(f"Analyze frame: {len(position_x) + 1} - {dx} / {dy} / {da}")
+      print(f"Analyze frame: {len(position_x)} - {dx} / {dy} / {da}")
 
       # Move to next frame
       prev_gray = frame_gray
@@ -324,6 +337,7 @@ parser.add_argument('-w', default=2, type=int, choices=[1, 2, 3, 4], help='windo
 parser.add_argument('-o', default='output.mp4', help='output file, default: output.mp4')
 args = parser.parse_args()
 
+calculateTransform = calculateTransform_goodFeaturesToTrack
 w, h, fps, position_x, position_y, position_a = analyse(args.inputfile)
 out_ftp = fps if args.fps <= 0 else args.fps
 transforms_x, transforms_y, transforms_a = stabilize( position_x, position_y, position_a, args.mode, int(fps * args.w) )
