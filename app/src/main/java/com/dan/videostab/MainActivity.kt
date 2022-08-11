@@ -672,6 +672,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             menuSave?.isEnabled = true
+            binding.viewMode.isEnabled = true
         }
 
         val originalAvailable = null != videoUriOriginal
