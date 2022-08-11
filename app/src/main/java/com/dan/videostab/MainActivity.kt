@@ -702,5 +702,12 @@ class MainActivity : AppCompatActivity() {
         binding.seekBarStrength.isEnabled = canStabilize
         binding.crop.isEnabled = canStabilize
         binding.fps.isEnabled = canStabilize
+
+        val videoProps = this.videoProps
+        if (null != videoProps) {
+            binding.info.text = "${videoProps.width} x ${videoProps.height}, fps: ${videoProps.frameRate}, $videoName"
+        } else {
+            binding.info.text = ""
+        }
     }
 }
