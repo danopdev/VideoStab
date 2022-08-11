@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Parcelable
 import android.provider.MediaStore
 import android.view.Menu
 import android.view.MenuItem
@@ -207,6 +208,21 @@ class MainActivity : AppCompatActivity() {
         updateView()
 
         setContentView(binding.root)
+
+        var initialUri: Uri? = null
+
+        if (null != intent && null != intent.action) {
+            if (Intent.ACTION_SEND == intent.action) {
+                val extraStream = intent.getParcelableExtra<Parcelable>(Intent.EXTRA_STREAM)
+                if (null != extraStream) {
+                    initialUri = extraStream as Uri
+                }
+            } else if(Intent.ACTION_VIEW == intent.action){
+                initialUri = intent.data
+            }
+        }
+
+        if (null != initialUri) openVideo(initialUri)
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
