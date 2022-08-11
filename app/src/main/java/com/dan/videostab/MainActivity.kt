@@ -443,7 +443,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun stabCalculateCrop( transforms: Trajectory, videoProps: VideoProps ): Double {
+    private fun stabCalculateAutoCrop( transforms: Trajectory, videoProps: VideoProps ): Double {
         var crop = 0.0
 
         for (index in transforms.x.indices) {
@@ -482,6 +482,12 @@ class MainActivity : AppCompatActivity() {
         return crop
     }
 
+    private fun stabGetCrop( transforms: Trajectory, videoProps: VideoProps ): Double {
+        val cropOption = binding.crop.selectedItem as String
+        val percentIndex = cropOption.indexOf('%')
+        if (percentIndex > 0) return cropOption.substring(0, percentIndex).toInt() / 100.0
+        return stabCalculateAutoCrop(transforms, videoProps)
+    }
 
     private fun stabApplyAsync() {
         BusyDialog.show("Smooth movements")
@@ -571,7 +577,7 @@ class MainActivity : AppCompatActivity() {
                 trajectory.a.delta( newTrajectoryA ),
         )
 
-        val crop = stabCalculateCrop(transforms, videoProps)
+        val crop = stabGetCrop(transforms, videoProps)
 
         val videoInput = openVideoCapture(tmpInputVideo)
         if (!videoInput.isOpened) throw FileNotFoundException()
@@ -605,7 +611,8 @@ class MainActivity : AppCompatActivity() {
 
             transforms.getTransform(index, t)
             warpAffine(frame, frameStabilized, t, frame.size())
-            fixBorder(frameStabilized, crop)
+
+            if (crop >= 0.001) fixBorder(frameStabilized, crop)
             videoOutput.write(frameStabilized)
         }
 
