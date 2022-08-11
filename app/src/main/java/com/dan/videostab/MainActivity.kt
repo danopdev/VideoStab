@@ -647,11 +647,10 @@ class MainActivity : AppCompatActivity() {
     private fun updateView() {
         if (!tmpOutputVideoExists) {
             binding.videoStabilized.setVideoURI(null)
-            binding.layoutViewMode.visibility = View.GONE
             binding.layoutOriginal.visibility = View.VISIBLE
             binding.layoutStabilized.visibility = View.GONE
+            binding.viewMode.isEnabled = false
             menuSave?.isEnabled = false
-            menuStabilize?.isEnabled = videoTrajectory != null
         } else {
             binding.videoStabilized.setVideoURI(File(tmpOutputVideo).toUri())
             binding.layoutViewMode.visibility = View.VISIBLE
@@ -673,12 +672,18 @@ class MainActivity : AppCompatActivity() {
             }
 
             menuSave?.isEnabled = true
-            menuStabilize?.isEnabled = true
         }
 
         val originalAvailable = null != videoUriOriginal
         binding.play.isEnabled = originalAvailable
         binding.pause.isEnabled = originalAvailable
         binding.stop.isEnabled = originalAvailable
+
+        val canStabilize = videoTrajectory != null
+        menuStabilize?.isEnabled = canStabilize
+        binding.algorithm.isEnabled = canStabilize
+        binding.seekBarStrength.isEnabled = canStabilize
+        binding.crop.isEnabled = canStabilize
+        binding.fps.isEnabled = canStabilize
     }
 }
