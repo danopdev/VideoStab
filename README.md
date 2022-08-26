@@ -38,7 +38,25 @@ Panning | distribute | distribute | reverse
 Panning (B) | distribute | distribute | moving average
 No rotation | none | none | reverse
 
+# Examples
+
+See the original vs stabilized video.
+
+## Original vs Generic
+![Generic](sample/original-vs-generic.mp4)
+
+## Original vs Still
+![Still](sample/original-vs-still.mp4)
+
+## Original vs Horizontal panning
+![H-Pan](sample/original-vs-h-pan.mp4)
+
+## Original vs Vertical panning
+![V-Pan](sample/original-vs-v-pan.mp4)
+
+## Original vs Panning
+![Pan](sample/original-vs-pan.mp4)
+
 # ToDo
 
-* Use MediaEncoder for better / faster results (h264 for example)
 * Use ffmpeg to copy the audio from the original video
