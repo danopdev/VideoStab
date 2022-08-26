@@ -43,19 +43,19 @@ No rotation | none | none | reverse
 See the original vs stabilized video.
 
 ## Original vs Generic
-https://github.com/danopdev/VideoStab/blob/master/sample/original-vs-generic-small.mp4
+https://user-images.githubusercontent.com/7062741/186948791-aaa36028-4838-4819-af13-e943bacb7746.mp4
 
 ## Original vs Still
-https://github.com/danopdev/VideoStab/blob/master/sample/original-vs-still-small.mp4
+https://user-images.githubusercontent.com/7062741/186948936-8897cbe2-3485-4d68-b86c-f6e74cec0487.mp4
 
 ## Original vs Horizontal panning
-https://github.com/danopdev/VideoStab/blob/master/sample/original-vs-h-pan-small.mp4
+https://user-images.githubusercontent.com/7062741/186948982-52f177b9-876d-4af1-87cf-397f3860d3e0.mp4
 
 ## Original vs Vertical panning
-https://github.com/danopdev/VideoStab/blob/master/sample/original-vs-v-pan-small.mp4
+https://user-images.githubusercontent.com/7062741/186949010-35b108d3-bb15-4303-8da3-e838687b6474.mp4
 
 ## Original vs Panning
-https://github.com/danopdev/VideoStab/blob/master/sample/original-vs-pan-small.mp4
+https://user-images.githubusercontent.com/7062741/186949026-6c30e8ef-572f-440a-bff1-12ad6493a987.mp4
 
 # ToDo
 
