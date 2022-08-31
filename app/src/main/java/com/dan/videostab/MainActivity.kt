@@ -519,7 +519,7 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
         }
 
-        val movingAverageWindowSize = videoProps.frameRate * (binding.seekBarStrength.progress + 1)
+        val movingAverageWindowSize = outputFrameRate * (binding.seekBarStrength.progress + 1)
 
         val newTrajectoryX: List<Double>
         val newTrajectoryY: List<Double>
