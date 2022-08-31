@@ -38,6 +38,39 @@ Panning | distribute | distribute | reverse
 Panning (B) | distribute | distribute | moving average
 No rotation | none | none | reverse
 
+# Interface
+![](screenshot/screenshot_small.jpg)
+
+## Menu
+
+Icon | Description
+--- | ---
+![](screenshot/menu_open.jpg) | Open a video file
+![](screenshot/menu_apply.jpg) | Apply the stabilisation using the current parameters
+![](screenshot/menu_save.jpg) | Save the current stabilized video
+
+## Input video informations
+
+![](screenshot/input_video_info.jpg)
+* Resolution (720x1280)
+* Auto-detected FPS (25). NOTE: can be wrong in some cases
+* File name ("00004_new")
+
+## Stabilisation parameters
+
+![](screenshot/parameters.jpg) | Save the current stabilized video
+
+* Algorithm: see "How it works" section for more details
+* Strength: seconds to be used for moving average window (1, 2, 3 or 4 seconds)
+* Crop: because the frames can be moved and rorated you can have black regions. This can be cropped (Auto, 0%, 5%, 10%)
+* FPS: you can for a specific FPS if the auto detection failes
+
+## View
+
+![](screenshot/view.jpg)
+
+You can see the original, stabilized or both (horizontal or vertical split) videos at the same time.
+
 # Examples
 
 See the original vs stabilized video.
