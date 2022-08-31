@@ -19,9 +19,12 @@
         <item>No rotation</item>
     </string-array>
     <string-array name="fps">
-        <item>Same as input</item>
+        <item>Auto-detect</item>
         <item>15</item>
+        <item>24</item>
+        <item>25</item>
         <item>30</item>
+        <item>50</item>
         <item>60</item>
         <item>120</item>
     </string-array>
