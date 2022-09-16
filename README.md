@@ -4,12 +4,6 @@ A simple video stabilisation for Android, based on:
 * https://learnopencv.com/video-stabilization-using-point-feature-matching-in-opencv/
 * https://github.com/spmallick/learnopencv/tree/master/VideoStabilization
 
-WARNING:
-* Work is still in progress
-
-Output video format:
-* Use MPEG4 encoder and try to get the best quality
-
 # How it works
 
 ## Analyse step
@@ -92,4 +86,4 @@ https://user-images.githubusercontent.com/7062741/186949026-6c30e8ef-572f-440a-b
 
 # ToDo
 
-* Use ffmpeg to copy the audio from the original video
+* Try to copy the audio from the original video
