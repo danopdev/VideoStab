@@ -32,6 +32,7 @@ import org.opencv.core.CvType.CV_64F
 import org.opencv.imgproc.Imgproc.*
 import org.opencv.video.Video.calcOpticalFlowPyrLK
 import org.opencv.videoio.VideoCapture
+import org.opencv.videoio.VideoWriter
 import org.opencv.videoio.Videoio.*
 import java.io.File
 import java.io.FileNotFoundException
@@ -87,8 +88,6 @@ class MainActivity : AppCompatActivity() {
         get() = applicationContext.cacheDir.absolutePath
     private val tmpOutputVideo: String
         get() = "$tmpFolder/tmp_video.mp4"
-    private val tmpOutputVideoIntermediate: String
-        get() = "$tmpFolder/tmp_video_intermediate.mp4"
     private val tmpOutputVideoExists: Boolean
         get() = File(tmpOutputVideo).exists()
     private val tmpInputVideo: String
@@ -378,7 +377,7 @@ class MainActivity : AppCompatActivity() {
                 frameCounter++
                 BusyDialog.show("Analyse frame: $frameCounter")
 
-                cvtColor(frame, frameGray, COLOR_RGB2GRAY)
+                cvtColor(frame, frameGray, COLOR_BGR2GRAY)
 
                 if (!prevGray.empty()) {
                     // Detect features in previous frame
@@ -598,22 +597,20 @@ class MainActivity : AppCompatActivity() {
         val videoInput = openVideoCapture(tmpInputVideo)
         if (!videoInput.isOpened) throw FileNotFoundException()
 
-        /*
+        val fourcc = when(binding.videoEncoder.selectedItemPosition) {
+            1 -> VideoWriter.fourcc('H', '2', '6', '4')
+            else -> VideoWriter.fourcc('H', '2', '6', '5')
+        }
+
         val videoOutput = VideoWriter(
-                tmpOutputVideoIntermediate,
-                VideoWriter.fourcc('M','J','P','G'),
+                tmpOutputVideo,
+                fourcc,
                 outputFrameRate.toDouble(),
                 Size( videoProps.width.toDouble(), videoProps.height.toDouble() )
         )
-        */
-        val videoOutput = VideoEncoder.create(
-                tmpOutputVideo,
-                outputFrameRate,
-                videoProps.width, videoProps.height
-        )
 
         if (!videoOutput.isOpened) {
-            throw FileNotFoundException(tmpOutputVideoIntermediate)
+            throw FileNotFoundException(tmpOutputVideo)
         }
 
         val frame = Mat()
@@ -640,8 +637,13 @@ class MainActivity : AppCompatActivity() {
         videoStop()
 
         GlobalScope.launch(Dispatchers.Default) {
-            BusyDialog.show(initialMessage)
-            asyncTask()
+            try {
+                BusyDialog.show(initialMessage)
+                asyncTask()
+            } catch (e: Exception) {
+
+            }
+
             runOnUiThread() {
                 updateView()
                 BusyDialog.dismiss()
@@ -681,7 +683,9 @@ class MainActivity : AppCompatActivity() {
                     binding.layoutStabilized.visibility = View.VISIBLE
                 }
                 else -> {
-                    binding.layoutPlayer.orientation = if (VIEW_MODE_SPLIT_VERTICAL == binding.viewMode.selectedItemPosition) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
+                    binding.layoutPlayer.orientation =
+                        if (VIEW_MODE_SPLIT_VERTICAL == binding.viewMode.selectedItemPosition) LinearLayout.VERTICAL
+                        else LinearLayout.HORIZONTAL
                     binding.layoutOriginal.visibility = View.VISIBLE
                     binding.layoutStabilized.visibility = View.VISIBLE
                 }
