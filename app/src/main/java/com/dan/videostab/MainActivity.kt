@@ -51,24 +51,6 @@ class MainActivity : AppCompatActivity() {
         const val REQUEST_PERMISSIONS = 1
         const val INTENT_OPEN_VIDEO = 2
 
-        const val VIEW_MODE_ORIGINAL = 0
-        const val VIEW_MODE_STABILIZED = 1
-        const val VIEW_MODE_SPLIT_HORIZONTAL = 2
-        const val VIEW_MODE_SPLIT_VERTICAL = 3
-
-        const val ALGORITHM_GENERIC = 0
-        const val ALGORITHM_GENERIC_B = 1
-        const val ALGORITHM_STILL = 2
-        const val ALGORITHM_HORIZONTAL_PANNING = 3
-        const val ALGORITHM_HORIZONTAL_PANNING_B = 4
-        const val ALGORITHM_VERTICAL_PANNING = 5
-        const val ALGORITHM_VERTICAL_PANNING_B = 6
-        const val ALGORITHM_PANNING = 7
-        const val ALGORITHM_PANNING_B = 8
-        const val ALGORITHM_NO_ROTATION = 9
-
-        const val SAVE_FOLDER = "/storage/emulated/0/VideoStab"
-
         private fun fixBorder(frame: Mat, crop: Double) {
             val t = getRotationMatrix2D(Point(frame.cols() / 2.0, frame.rows() / 2.0), 0.0, 1.0 + crop)
             warpAffine(frame, frame, t, frame.size())
@@ -84,6 +66,9 @@ class MainActivity : AppCompatActivity() {
     private var menuSave: MenuItem? = null
     private var menuStabilize: MenuItem? = null
 
+    val settings: Settings by lazy { Settings(this) }
+
+
     private val tmpFolder: String
         get() = applicationContext.cacheDir.absolutePath
     private val tmpOutputVideo: String
@@ -92,6 +77,7 @@ class MainActivity : AppCompatActivity() {
         get() = File(tmpOutputVideo).exists()
     private val tmpInputVideo: String
         get() = "$tmpFolder/input.video"
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -171,6 +157,9 @@ class MainActivity : AppCompatActivity() {
 
         BusyDialog.create(this)
 
+        binding.algorithm.setSelection(settings.algorithm)
+        binding.seekBarStrength.progress = settings.strength
+
         binding.videoOriginal.setAudioFocusRequest(AudioManager.AUDIOFOCUS_NONE)
         binding.videoOriginal.setOnPreparedListener { newMediaPlayer ->
             newMediaPlayer.setVolume(0.0f, 0.0f)
@@ -193,7 +182,7 @@ class MainActivity : AppCompatActivity() {
             videoStop()
         }
 
-        binding.viewMode.setSelection(VIEW_MODE_SPLIT_HORIZONTAL)
+        binding.viewMode.setSelection(settings.viewMode)
 
         binding.viewMode.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>, view: View, position: Int, id: Long) {
@@ -237,9 +226,29 @@ class MainActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when(item.itemId) {
-            R.id.menuOpen -> handleOpenVideo()
-            R.id.menuStabilize -> handleStabilize()
-            R.id.menuSave -> handleSave()
+            R.id.menuOpen -> {
+                handleOpenVideo()
+                return true
+            }
+
+            R.id.menuStabilize -> {
+                handleStabilize()
+                return true
+            }
+
+            R.id.menuSave -> {
+                handleSave()
+                settings.algorithm = binding.algorithm.selectedItemPosition
+                settings.strength = binding.seekBarStrength.progress
+                settings.viewMode = binding.viewMode.selectedItemPosition
+                settings.saveProperties()
+                return true
+            }
+
+            R.id.menuSettings -> {
+                SettingsDialog.show(this)
+                return true
+            }
         }
 
         return super.onOptionsItemSelected(item)
@@ -308,7 +317,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun createOutputFolder() {
-        val file = File(SAVE_FOLDER)
+        val file = File(Settings.SAVE_FOLDER)
         if (!file.exists()) file.mkdirs()
     }
 
@@ -319,7 +328,7 @@ class MainActivity : AppCompatActivity() {
         var counter = 0
 
         while(counter < 999) {
-            outputFilePath = SAVE_FOLDER + "/" + videoName + (if (0 == counter) "" else "_${String.format("%03d", counter)}") + ".mp4"
+            outputFilePath = Settings.SAVE_FOLDER + "/" + videoName + (if (0 == counter) "" else "_${String.format("%03d", counter)}") + ".mp4"
             if (!File(outputFilePath).exists()) break
             counter++
         }
@@ -525,55 +534,55 @@ class MainActivity : AppCompatActivity() {
         val newTrajectoryA: List<Double>
 
         when(binding.algorithm.selectedItemPosition) {
-            ALGORITHM_GENERIC_B -> {
+            Settings.ALGORITHM_GENERIC_B -> {
                 newTrajectoryX = trajectory.x.movingAverage(movingAverageWindowSize)
                 newTrajectoryY = trajectory.y.movingAverage(movingAverageWindowSize)
                 newTrajectoryA = List(trajectory.size) { 0.0 }
             }
 
-            ALGORITHM_STILL -> {
+            Settings.ALGORITHM_STILL -> {
                 newTrajectoryX = List(trajectory.size) { 0.0 }
                 newTrajectoryY = newTrajectoryX
                 newTrajectoryA = newTrajectoryX
             }
 
-            ALGORITHM_HORIZONTAL_PANNING -> {
+            Settings.ALGORITHM_HORIZONTAL_PANNING -> {
                 newTrajectoryX = trajectory.x.distribute()
                 newTrajectoryY = List(trajectory.size) { 0.0 }
                 newTrajectoryA = newTrajectoryY
             }
 
-            ALGORITHM_HORIZONTAL_PANNING_B -> {
+            Settings.ALGORITHM_HORIZONTAL_PANNING_B -> {
                 newTrajectoryX = trajectory.x.distribute()
                 newTrajectoryY = List(trajectory.size) { 0.0 }
                 newTrajectoryA = trajectory.a.movingAverage(movingAverageWindowSize)
             }
 
-            ALGORITHM_VERTICAL_PANNING -> {
+            Settings.ALGORITHM_VERTICAL_PANNING -> {
                 newTrajectoryX = List(trajectory.size) { 0.0 }
                 newTrajectoryY = trajectory.y.distribute()
                 newTrajectoryA = newTrajectoryX
             }
 
-            ALGORITHM_VERTICAL_PANNING_B -> {
+            Settings.ALGORITHM_VERTICAL_PANNING_B -> {
                 newTrajectoryX = List(trajectory.size) { 0.0 }
                 newTrajectoryY = trajectory.y.distribute()
                 newTrajectoryA = trajectory.a.movingAverage(movingAverageWindowSize)
             }
 
-            ALGORITHM_PANNING -> {
+            Settings.ALGORITHM_PANNING -> {
                 newTrajectoryX = trajectory.x.distribute()
                 newTrajectoryY = trajectory.y.distribute()
                 newTrajectoryA = List(trajectory.size) { 0.0 }
             }
 
-            ALGORITHM_PANNING_B -> {
+            Settings.ALGORITHM_PANNING_B -> {
                 newTrajectoryX = trajectory.x.distribute()
                 newTrajectoryY = trajectory.y.distribute()
                 newTrajectoryA = trajectory.a.movingAverage(movingAverageWindowSize)
             }
 
-            ALGORITHM_NO_ROTATION -> {
+            Settings.ALGORITHM_NO_ROTATION -> {
                 newTrajectoryX = trajectory.x
                 newTrajectoryY = trajectory.y
                 newTrajectoryA = List(trajectory.size) { 0.0 }
@@ -597,8 +606,8 @@ class MainActivity : AppCompatActivity() {
         val videoInput = openVideoCapture(tmpInputVideo)
         if (!videoInput.isOpened) throw FileNotFoundException()
 
-        val fourcc = when(binding.videoEncoder.selectedItemPosition) {
-            1 -> VideoWriter.fourcc('H', '2', '6', '4')
+        val fourcc = when(settings.encoder) {
+            Settings.ENCODER_H264 -> VideoWriter.fourcc('H', '2', '6', '4')
             else -> VideoWriter.fourcc('H', '2', '6', '5')
         }
 
@@ -674,17 +683,17 @@ class MainActivity : AppCompatActivity() {
             binding.layoutViewMode.visibility = View.VISIBLE
 
             when (binding.viewMode.selectedItemPosition) {
-                VIEW_MODE_ORIGINAL -> {
+                Settings.VIEW_MODE_ORIGINAL -> {
                     binding.layoutOriginal.visibility = View.VISIBLE
                     binding.layoutStabilized.visibility = View.GONE
                 }
-                VIEW_MODE_STABILIZED -> {
+                Settings.VIEW_MODE_STABILIZED -> {
                     binding.layoutOriginal.visibility = View.GONE
                     binding.layoutStabilized.visibility = View.VISIBLE
                 }
                 else -> {
                     binding.layoutPlayer.orientation =
-                        if (VIEW_MODE_SPLIT_VERTICAL == binding.viewMode.selectedItemPosition) LinearLayout.VERTICAL
+                        if (Settings.VIEW_MODE_SPLIT_VERTICAL == binding.viewMode.selectedItemPosition) LinearLayout.VERTICAL
                         else LinearLayout.HORIZONTAL
                     binding.layoutOriginal.visibility = View.VISIBLE
                     binding.layoutStabilized.visibility = View.VISIBLE
