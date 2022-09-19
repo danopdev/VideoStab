@@ -153,7 +153,11 @@ class MainActivity : AppCompatActivity() {
     private fun onPermissionsAllowed() {
         TmpFiles(tmpFolder).delete()
 
-        if (!OpenCVLoader.initDebug()) fatalError("Failed to initialize OpenCV")
+        try {
+            System.loadLibrary("opencv_java4")
+        } catch (e: Exception) {
+            fatalError("Failed to initialize OpenCV")
+        }
 
         BusyDialog.create(this)
 
@@ -254,6 +258,7 @@ class MainActivity : AppCompatActivity() {
         return super.onOptionsItemSelected(item)
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, intent: Intent?) {
         if (resultCode == RESULT_OK) {
             if (requestCode == INTENT_OPEN_VIDEO) {
@@ -309,6 +314,7 @@ class MainActivity : AppCompatActivity() {
 
             success = true
         } catch (e: Exception) {
+            //TODO
         }
 
         runOnUiThread {
@@ -464,6 +470,7 @@ class MainActivity : AppCompatActivity() {
 
             videoTrajectory = Trajectory( trajectoryX.toList(), trajectoryY.toList(), trajectoryA.toList() )
         } catch (e: Exception) {
+            //TODO
         }
     }
 
@@ -525,6 +532,7 @@ class MainActivity : AppCompatActivity() {
         try {
             outputFrameRate = (binding.fps.selectedItem as String).toInt()
         } catch (e: Exception) {
+            //TODO
         }
 
         val movingAverageWindowSize = outputFrameRate * (binding.seekBarStrength.progress + 1)
@@ -650,10 +658,10 @@ class MainActivity : AppCompatActivity() {
                 BusyDialog.show(initialMessage)
                 asyncTask()
             } catch (e: Exception) {
-
+                //TODO
             }
 
-            runOnUiThread() {
+            runOnUiThread {
                 updateView()
                 BusyDialog.dismiss()
             }
