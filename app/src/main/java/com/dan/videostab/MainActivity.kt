@@ -22,10 +22,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import com.dan.videostab.databinding.ActivityMainBinding
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
-import org.opencv.android.OpenCVLoader
+import kotlinx.coroutines.*
 import org.opencv.calib3d.Calib3d.estimateAffinePartial2D
 import org.opencv.core.*
 import org.opencv.core.CvType.CV_64F
@@ -380,82 +377,105 @@ class MainActivity : AppCompatActivity() {
             val videoRotation = videoInput.get(CAP_PROP_ORIENTATION_META)
 
             var frameCounter = 0
-            val frameGray = Mat()
-            val prevGray = Mat()
+            val readFrame = Mat()
+            // 0 = read frame
+            // 1, 2, 3 = new gray frame, analyse gray frame & analyze prev gray frame
+            val frames = listOf( Mat(), Mat(), Mat() )
+            var readIndex = 0
+            var analyzeIndex = 1
+            var analyzePrevIndex = 2
+            var tmpIndex: Int
+
             val lastT = Mat()
-            val frame = Mat()
             var x = 0.0
             var y = 0.0
             var a = 0.0
 
-            while(videoInput.read(frame)) {
-                frameCounter++
-                BusyDialog.show("Analyse frame: $frameCounter")
-
-                cvtColor(frame, frameGray, COLOR_BGR2GRAY)
-
-                if (!prevGray.empty()) {
-                    // Detect features in previous frame
-                    val prevPts = MatOfPoint()
-                    goodFeaturesToTrack(prevGray, prevPts, 200, 0.01, 30.0)
-
-                    // Calculate optical flow (i.e. track feature points)
-                    val prevPts2f = MatOfPoint2f()
-                    prevPts2f.fromList(prevPts.toList())
-                    val framePts2f = MatOfPoint2f()
-                    val status = MatOfByte()
-                    val err = MatOfFloat()
-                    calcOpticalFlowPyrLK(prevGray, frameGray, prevPts2f, framePts2f, status, err)
-
-                    // Filter only valid points
-                    val prevPts2fList = prevPts2f.toList()
-                    val framePts2fList = framePts2f.toList()
-                    val statusList = status.toList()
-
-                    val prevPts2fFilteredList = mutableListOf<Point>()
-                    val framePts2fFilteredList = mutableListOf<Point>()
-
-                    for( i in prevPts2fList.indices ) {
-                        if (0.toByte() != statusList[i]) {
-                            prevPts2fFilteredList.add(prevPts2fList[i])
-                            framePts2fFilteredList.add(framePts2fList[i])
-                        }
-                    }
-
-                    // Find transformation matrix
-                    val prevPtsMat = MatOfPoint2f()
-                    val framePtsMat = MatOfPoint2f()
-
-                    prevPtsMat.fromList(prevPts2fFilteredList)
-                    framePtsMat.fromList(framePts2fFilteredList)
-
-                    val t: Mat = estimateAffinePartial2D(prevPtsMat, framePtsMat)
-
-                    // In rare cases no transform is found.
-                    // We'll just use the last known good transform.
-                    if(t.empty()) {
-                        lastT.copyTo(t)
+            while(true) {
+                val readJob = GlobalScope.async(Dispatchers.Default) {
+                    if (videoInput.read(readFrame)) {
+                        cvtColor(readFrame, frames[readIndex], COLOR_BGR2GRAY)
                     } else {
-                        t.copyTo(lastT)
+                        frames[readIndex].release()
                     }
-
-                    // Extract translation
-                    val dx = t.get(0, 2)[0]
-                    val dy = t.get(1, 2)[0]
-
-                    // Extract rotation angle
-                    val da = atan2(t.get(1, 0)[0], t.get(0, 0)[0])
-
-                    x += dx
-                    y += dy
-                    a += da
                 }
 
-                trajectoryX.add(x)
-                trajectoryY.add(y)
-                trajectoryA.add(a)
+                if (!frames[analyzeIndex].empty()) {
+                    frameCounter++
+                    BusyDialog.show("Analyse frame: $frameCounter")
 
-                frameGray.copyTo(prevGray)
+                    if (!frames[analyzePrevIndex].empty()) {
+                        // Detect features in previous frame
+                        val prevPts = MatOfPoint()
+                        goodFeaturesToTrack(frames[analyzePrevIndex], prevPts, 200, 0.01, 30.0)
+
+                        // Calculate optical flow (i.e. track feature points)
+                        val prevPts2f = MatOfPoint2f()
+                        prevPts2f.fromList(prevPts.toList())
+                        val framePts2f = MatOfPoint2f()
+                        val status = MatOfByte()
+                        val err = MatOfFloat()
+                        calcOpticalFlowPyrLK(frames[analyzePrevIndex], frames[analyzeIndex], prevPts2f, framePts2f, status, err)
+
+                        // Filter only valid points
+                        val prevPts2fList = prevPts2f.toList()
+                        val framePts2fList = framePts2f.toList()
+                        val statusList = status.toList()
+
+                        val prevPts2fFilteredList = mutableListOf<Point>()
+                        val framePts2fFilteredList = mutableListOf<Point>()
+
+                        for( i in prevPts2fList.indices ) {
+                            if (0.toByte() != statusList[i]) {
+                                prevPts2fFilteredList.add(prevPts2fList[i])
+                                framePts2fFilteredList.add(framePts2fList[i])
+                            }
+                        }
+
+                        // Find transformation matrix
+                        val prevPtsMat = MatOfPoint2f()
+                        val framePtsMat = MatOfPoint2f()
+
+                        prevPtsMat.fromList(prevPts2fFilteredList)
+                        framePtsMat.fromList(framePts2fFilteredList)
+
+                        val t: Mat = estimateAffinePartial2D(prevPtsMat, framePtsMat)
+
+                        // In rare cases no transform is found.
+                        // We'll just use the last known good transform.
+                        if(t.empty()) {
+                            lastT.copyTo(t)
+                        } else {
+                            t.copyTo(lastT)
+                        }
+
+                        // Extract translation
+                        val dx = t.get(0, 2)[0]
+                        val dy = t.get(1, 2)[0]
+
+                        // Extract rotation angle
+                        val da = atan2(t.get(1, 0)[0], t.get(0, 0)[0])
+
+                        x += dx
+                        y += dy
+                        a += da
+                    }
+
+                    trajectoryX.add(x)
+                    trajectoryY.add(y)
+                    trajectoryA.add(a)
+                }
+
+                runBlocking {
+                    readJob.await()
+                }
+
+                if (frames[readIndex].empty()) break
+
+                tmpIndex = readIndex
+                readIndex = analyzePrevIndex
+                analyzePrevIndex = analyzeIndex
+                analyzeIndex = tmpIndex
             }
 
             videoInput.release()
