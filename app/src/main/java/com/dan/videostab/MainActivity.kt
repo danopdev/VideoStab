@@ -9,7 +9,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import org.opencv.android.OpenCVLoader
 
 
 class MainActivity : AppCompatActivity() {
@@ -75,8 +74,13 @@ class MainActivity : AppCompatActivity() {
         grantResults: IntArray
     ) {
         when (requestCode) {
-            REQUEST_PERMISSIONS -> handleRequestPermissions(grantResults)
+            REQUEST_PERMISSIONS -> {
+                handleRequestPermissions(grantResults)
+                return
+            }
         }
+
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
