@@ -8,7 +8,6 @@ import android.view.ViewGroup
 import androidx.fragment.app.DialogFragment
 import com.dan.videostab.databinding.BusyDialogBinding
 
-
 class BusyDialog( private var message: String): DialogFragment() {
 
     companion object {
