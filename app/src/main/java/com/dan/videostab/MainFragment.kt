@@ -49,9 +49,9 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
     private var videoName  = ""
     private var videoProps: VideoProps? = null
     private var videoTrajectory: Trajectory? = null
-
+    private var firstFrame = Mat()
+    private var firstFrameMask = Mat()
     private var menuSave: MenuItem? = null
-    private var menuStabilize: MenuItem? = null
 
     private val tmpFolder: String
         get() = requireContext().cacheDir.absolutePath
@@ -113,6 +113,24 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             videoStop()
         }
 
+        binding.buttonStabilize.setOnClickListener {
+            handleStabilize()
+        }
+
+        binding.switchUseMask.setOnCheckedChangeListener { _, _ ->
+            if (!firstFrame.empty() && !firstFrameMask.empty()) {
+                openVideo()
+            }
+        }
+
+        binding.buttonEditMask.setOnClickListener {
+            if (binding.switchUseMask.isEnabled && binding.switchUseMask.isChecked && !firstFrame.empty()) {
+                MaskEditFragment.show( activity, firstFrame, firstFrameMask ) {
+                    openVideo()
+                }
+            }
+        }
+
         binding.viewMode.setSelection(settings.viewMode)
 
         binding.viewMode.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
@@ -152,14 +170,12 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
         inflater.inflate(R.menu.app_menu, menu)
 
-        menuStabilize = menu.findItem(R.id.menuStabilize)
         menuSave = menu.findItem(R.id.menuSave)
 
         updateView()
     }
 
     override fun onDestroyOptionsMenu() {
-        menuStabilize = null
         menuSave = null
         super.onDestroyOptionsMenu()
     }
@@ -168,11 +184,6 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         when(item.itemId) {
             R.id.menuOpen -> {
                 handleOpenVideo()
-                return true
-            }
-
-            R.id.menuStabilize -> {
-                handleStabilize()
                 return true
             }
 
@@ -293,13 +304,13 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
     }
 
 
-    private fun stabAnalyzeAsync() {
+    private fun stabAnalyzeAsync( newVideo: Boolean ) {
         try {
             videoProps = null
             videoTrajectory = null
 
             //OpenCV expects a file path not an URI so copy it
-            copyUriToTempFile()
+            if (newVideo) copyUriToTempFile()
 
             val videoInput = openVideoCapture(tmpInputVideo)
             if (!videoInput.isOpened) return
@@ -331,6 +342,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             while(true) {
                 val readJob = GlobalScope.async(Dispatchers.Default) {
                     if (videoInput.read(readFrame)) {
+                        if (firstFrame.empty()) firstFrame = readFrame.clone()
                         cvtColor(readFrame, frames[readIndex], COLOR_BGR2GRAY)
                     } else {
                         frames[readIndex].release()
@@ -344,7 +356,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
                     if (!frames[analyzePrevIndex].empty()) {
                         // Detect features in previous frame
                         val prevPts = MatOfPoint()
-                        goodFeaturesToTrack(frames[analyzePrevIndex], prevPts, 200, 0.01, 30.0)
+                        goodFeaturesToTrack(frames[analyzePrevIndex], prevPts, 200, 0.01, 30.0, firstFrameMask)
 
                         // Calculate optical flow (i.e. track feature points)
                         val prevPts2f = MatOfPoint2f()
@@ -625,15 +637,22 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         }
     }
 
-    private fun openVideo(videoUri: Uri) {
-        TmpFiles(tmpFolder).delete()
+    private fun openVideo(videoUri: Uri? = null) {
         videoProps = null
         videoTrajectory = null
-        videoUriOriginal = videoUri
-        videoName = (DocumentFile.fromSingleUri(requireContext(), videoUri)?.name ?: "").split('.')[0]
-        binding.videoOriginal.setVideoURI(videoUriOriginal)
-        updateView()
-        runAsync("Prepare") { stabAnalyzeAsync() }
+
+        if (null != videoUri) {
+            firstFrame = Mat()
+            firstFrameMask = Mat()
+            TmpFiles(tmpFolder).delete()
+            videoUriOriginal = videoUri
+            videoName = (DocumentFile.fromSingleUri(requireContext(), videoUri)?.name ?: "").split('.')[0]
+            binding.videoOriginal.setVideoURI(videoUriOriginal)
+            binding.switchUseMask.isChecked = false
+            updateView()
+        }
+
+        runAsync("Prepare") { stabAnalyzeAsync(videoUri != null) }
     }
 
     private fun updateView() {
@@ -675,7 +694,9 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         binding.stop.isEnabled = originalAvailable
 
         val canStabilize = videoTrajectory != null
-        menuStabilize?.isEnabled = canStabilize
+        binding.switchUseMask.isEnabled = canStabilize
+        binding.buttonEditMask.isEnabled = canStabilize
+        binding.buttonStabilize.isEnabled = canStabilize
         binding.algorithm.isEnabled = canStabilize
         binding.seekBarStrength.isEnabled = canStabilize
         binding.crop.isEnabled = canStabilize

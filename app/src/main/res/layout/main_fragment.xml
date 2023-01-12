@@ -19,6 +19,38 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <Switch
+                android:id="@+id/switchUseMask"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Use mask" />
+
+            <ImageButton
+                android:id="@+id/buttonEditMask"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:srcCompat="@android:drawable/ic_menu_edit" />
+
+            <TextView
+                android:id="@+id/textView3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <Button
+                android:id="@+id/buttonStabilize"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Stabilize"
+                android:textAllCaps="false" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:layout_gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -35,13 +67,6 @@
                 android:layout_weight="1"
                 android:entries="@array/algorithm"
                 android:spinnerMode="dropdown" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
-            android:orientation="horizontal">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -52,11 +77,18 @@
             <SeekBar
                 android:id="@+id/seekBarStrength"
                 style="@style/Widget.AppCompat.SeekBar.Discrete"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:max="3"
                 android:progress="1" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:orientation="horizontal">
 
         </LinearLayout>
 
@@ -79,13 +111,6 @@
                 android:layout_weight="1"
                 android:entries="@array/crop"
                 android:spinnerMode="dropdown" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
-            android:orientation="horizontal">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -100,6 +125,7 @@
                 android:layout_weight="1"
                 android:entries="@array/fps"
                 android:spinnerMode="dropdown" />
+
         </LinearLayout>
 
         <LinearLayout

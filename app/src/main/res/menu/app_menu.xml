@@ -8,11 +8,6 @@
         android:title="Open"
         app:showAsAction="always" />
     <item
-        android:id="@+id/menuStabilize"
-        android:icon="@android:drawable/ic_popup_sync"
-        android:title="Stabilize"
-        app:showAsAction="always" />
-    <item
         android:id="@+id/menuSave"
         android:icon="@android:drawable/ic_menu_save"
         android:title="Save"
