@@ -33,7 +33,7 @@ Panning (B) | distribute | distribute | moving average
 No rotation | none | none | reverse
 
 # Interface
-Before stabilisation | After stabilisation
+lBefore stabilisation | After stabilisation
 --- | ---
 ![](screenshot/main_no_stab.jpg) | ![](screenshot/main_stab.jpg)
 
