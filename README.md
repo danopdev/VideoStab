@@ -33,27 +33,31 @@ Panning (B) | distribute | distribute | moving average
 No rotation | none | none | reverse
 
 # Interface
-![](screenshot/screenshot_small.jpg)
+Before stabilisation | After stabilisation
+--- | ---
+![](screenshot/main_no_stab.jpg) | ![](screenshot/main_stab.jpg)
 
 ## Menu
 
 Icon | Description
 --- | ---
 ![](screenshot/menu_open.jpg) | Open a video file
-![](screenshot/menu_apply.jpg) | Apply the stabilisation using the current parameters
 ![](screenshot/menu_save.jpg) | Save the current stabilized video
+![](screenshot/menu_settings.jpg) | Application settings
 
 ## Input video informations
 
 ![](screenshot/input_video_info.jpg)
-* Resolution (720x1280)
-* Auto-detected FPS (25). NOTE: can be wrong in some cases
-* File name ("00004_new")
+* Resolution
+* Auto-detected FPS. NOTE: can be wrong in some cases
+* File name
 
 ## Stabilisation parameters
 
-![](screenshot/parameters.jpg) | Save the current stabilized video
+![](screenshot/stabilisation.jpg)
 
+* Use mask / edit mask: useful for difficult scenarios (see Mask section)
+* Stabilize button: you need to press it to update the stabilisation (it's to slow to be updated automaticaly at every change)
 * Algorithm: see "How it works" section for more details
 * Strength: seconds to be used for moving average window (1, 2, 3 or 4 seconds)
 * Crop: because the frames can be moved and rorated you can have black regions. This can be cropped (Auto, 0%, 5%, 10%)
@@ -65,7 +69,22 @@ Icon | Description
 
 You can see the original, stabilized or both (horizontal or vertical split) videos at the same time.
 
+## Mask
+
+Some video have big moving element (like big clouds) that can false frame alignemnt.
+
+This screen allow to draw a mask for the first frame that specify items that suppose to be still.
+
+![](screenshot/edit_mask_small.jpg)
+
+The light part is the mask.
+You can clear the mask, fill (all pixels are used) and you can draw / erase.
+To draw / erase you must press and keep hold one of the buttons and with another edit the mask.
+
+See thre result: original (left), still without mask (middle) and still with the mask (right).
+
 # Examples
+
 
 See the original vs stabilized video.
 
