@@ -6,7 +6,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_margin="10dp"
-        android:background="#B3FFFFFF"
+        android:background="?android:attr/colorBackground"
         android:gravity="center"
         android:minWidth="300dp"
         android:orientation="vertical"
