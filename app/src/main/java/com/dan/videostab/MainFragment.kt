@@ -1,12 +1,11 @@
 package com.dan.videostab
 
-import android.content.ContentValues
 import android.content.Intent
 import android.media.AudioManager
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Bundle
 import android.os.Parcelable
-import android.provider.MediaStore
 import android.view.*
 import android.widget.AdapterView
 import android.widget.LinearLayout
@@ -252,11 +251,8 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             inputStream.close()
             outputStream.close()
 
-            val values = ContentValues()
-            @Suppress("DEPRECATION")
-            values.put(MediaStore.Video.Media.DATA, outputPath)
-            values.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-            activity.contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+            //Add it to gallery
+            MediaScannerConnection.scanFile(context, arrayOf(outputPath), null, null)
 
             success = true
         } catch (e: Exception) {

@@ -3,6 +3,7 @@ package com.dan.videostab
 
 import android.app.Activity
 import android.content.Context
+import android.os.Environment
 import kotlin.reflect.KMutableProperty
 import kotlin.reflect.KVisibility
 import kotlin.reflect.full.createType
@@ -33,7 +34,8 @@ class Settings( private val activity: Activity) {
         const val ENCODER_H265 = 0
         const val ENCODER_H264 = 1
 
-        const val SAVE_FOLDER = "/storage/emulated/0/VideoStab"
+        const val SAVE_FOLDER_SUFFIX = "/VideoStab"
+        val SAVE_FOLDER = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES).absolutePath + SAVE_FOLDER_SUFFIX
     }
 
     var viewMode: Int = VIEW_MODE_SPLIT_HORIZONTAL
@@ -44,6 +46,7 @@ class Settings( private val activity: Activity) {
     init {
         loadProperties()
     }
+
 
     private fun forEachSettingProperty( listener: (KMutableProperty<*>)->Unit ) {
         for( member in this::class.declaredMemberProperties ) {
