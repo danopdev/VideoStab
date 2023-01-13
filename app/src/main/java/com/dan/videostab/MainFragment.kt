@@ -21,7 +21,6 @@ import org.opencv.core.CvType.CV_64F
 import org.opencv.imgproc.Imgproc.*
 import org.opencv.video.Video.calcOpticalFlowPyrLK
 import org.opencv.videoio.VideoCapture
-import org.opencv.videoio.VideoWriter
 import org.opencv.videoio.Videoio.*
 import java.io.File
 import java.io.FileNotFoundException
@@ -306,6 +305,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
     private fun stabAnalyzeAsync( newVideo: Boolean ) {
         try {
+            val useMask = binding.switchUseMask.isEnabled && binding.switchUseMask.isChecked && !firstFrameMask.empty()
             videoProps = null
             videoTrajectory = null
 
@@ -356,7 +356,13 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
                     if (!frames[analyzePrevIndex].empty()) {
                         // Detect features in previous frame
                         val prevPts = MatOfPoint()
-                        goodFeaturesToTrack(frames[analyzePrevIndex], prevPts, 200, 0.01, 30.0, firstFrameMask)
+                        goodFeaturesToTrack(
+                            frames[analyzePrevIndex],
+                            prevPts,
+                            200,
+                            0.01,
+                            30.0,
+                            if (useMask) firstFrameMask else Mat())
 
                         // Calculate optical flow (i.e. track feature points)
                         val prevPts2f = MatOfPoint2f()
@@ -583,16 +589,12 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         val videoInput = openVideoCapture(tmpInputVideo)
         if (!videoInput.isOpened) throw FileNotFoundException()
 
-        val fourcc = when(settings.encoder) {
-            Settings.ENCODER_H264 -> VideoWriter.fourcc('H', '2', '6', '4')
-            else -> VideoWriter.fourcc('H', '2', '6', '5')
-        }
-
-        val videoOutput = VideoWriter(
-                tmpOutputVideo,
-                fourcc,
-                outputFrameRate.toDouble(),
-                Size( videoProps.width.toDouble(), videoProps.height.toDouble() )
+        val videoOutput = VideoEncoder.create(
+            tmpOutputVideo,
+            outputFrameRate,
+            videoProps.width,
+            videoProps.height,
+            Settings.ENCODER_H265 == settings.encoder
         )
 
         if (!videoOutput.isOpened) {
