@@ -103,7 +103,3 @@ https://user-images.githubusercontent.com/7062741/186949010-35b108d3-bb15-4303-8
 
 ## Original vs Panning
 https://user-images.githubusercontent.com/7062741/186949026-6c30e8ef-572f-440a-bff1-12ad6493a987.mp4
-
-# ToDo
-
-* Try to copy the audio from the original video
