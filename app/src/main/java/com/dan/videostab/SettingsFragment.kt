@@ -19,6 +19,7 @@ class SettingsFragment(activity: MainActivity ) : AppFragment(activity) {
 
     override fun onBack(homeButton: Boolean) {
         settings.encoder = binding.videoEncoder.selectedItemPosition
+        settings.keepAudio = binding.switchKeepAudio.isChecked
         settings.saveProperties()
     }
 
@@ -26,6 +27,7 @@ class SettingsFragment(activity: MainActivity ) : AppFragment(activity) {
         binding = SettingsFragmentBinding.inflate( inflater )
 
         binding.videoEncoder.setSelection(settings.encoder)
+        binding.switchKeepAudio.isChecked = settings.keepAudio
 
         return binding.root
     }

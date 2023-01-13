@@ -37,6 +37,12 @@
                         android:entries="@array/video_encoder"
                         android:spinnerMode="dropdown" />
                 </LinearLayout>
+
+                <Switch
+                    android:id="@+id/switchKeepAudio"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Keep audio" />
             </LinearLayout>
         </ScrollView>
     </LinearLayout>

@@ -42,6 +42,7 @@ class Settings( private val activity: Activity) {
     var algorithm: Int = ALGORITHM_GENERIC
     var strength: Int = 1
     var encoder: Int = ENCODER_H265
+    var keepAudio = false
 
     init {
         loadProperties()

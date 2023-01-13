@@ -245,11 +245,15 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         val outputPath = getOutputPath()
 
         try {
-            val inputStream = File(tmpOutputVideo).inputStream()
-            val outputStream = File(outputPath).outputStream()
-            inputStream.copyTo(outputStream)
-            inputStream.close()
-            outputStream.close()
+            if (settings.keepAudio) {
+                VideoMerge.merge(outputPath, tmpOutputVideo, tmpInputVideo)
+            } else {
+                val inputStream = File(tmpOutputVideo).inputStream()
+                val outputStream = File(outputPath).outputStream()
+                inputStream.copyTo(outputStream)
+                inputStream.close()
+                outputStream.close()
+            }
 
             //Add it to gallery
             MediaScannerConnection.scanFile(context, arrayOf(outputPath), null, null)
