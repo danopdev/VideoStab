@@ -82,6 +82,7 @@ You can clear the mask, fill (all pixels are used) and you can draw / erase.
 To draw / erase you must press and keep hold one of the buttons and with another edit the mask.
 
 See thre result: original (left), still without mask (middle) and still with the mask (right).
+
 https://user-images.githubusercontent.com/7062741/212324215-013dbb22-1a26-42d4-9599-19d6a87e3fa3.mp4
 
 # Examples
