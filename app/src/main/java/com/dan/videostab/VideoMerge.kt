@@ -1,10 +1,13 @@
 package com.dan.videostab
 
+import android.content.Context
 import android.media.MediaCodec
 import android.media.MediaCodec.BufferInfo
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import android.net.Uri
+import java.io.File
 import java.nio.ByteBuffer
 
 class VideoMerge {
@@ -12,9 +15,9 @@ class VideoMerge {
         private const val BUFFER_SIZE = 1024 * 1024 //1 MB
         private const val VIDEO_MIME_PREFIX = "video/"
 
-        private fun addTracks( muxer: MediaMuxer, sourceFile: String, filter: (String)->Boolean ) {
+        private fun addTracks(muxer: MediaMuxer, context: Context, uri: Uri, filter: (String)->Boolean ) {
             val extractor = MediaExtractor()
-            extractor.setDataSource(sourceFile)
+            extractor.setDataSource(context, uri, null)
 
             for (sourceTrackIndex in 0 until extractor.trackCount) {
                 val trackFormat = extractor.getTrackFormat(sourceTrackIndex)
@@ -25,12 +28,12 @@ class VideoMerge {
             extractor.release()
         }
 
-        private fun copyTracks( muxer: MediaMuxer, sourceFile: String, buffer: ByteBuffer, startDestTrackIndex: Int, filter: (String)->Boolean ): Int {
+        private fun copyTracks( muxer: MediaMuxer, context: Context, uri: Uri, buffer: ByteBuffer, startDestTrackIndex: Int, filter: (String)->Boolean ): Int {
             val extractor = MediaExtractor()
             val bufferInfo = BufferInfo()
             var destTrackIndex = startDestTrackIndex
 
-            extractor.setDataSource(sourceFile)
+            extractor.setDataSource(context, uri, null)
 
             for (sourceTrackIndex in 0 until extractor.trackCount) {
                 val trackFormat = extractor.getTrackFormat(sourceTrackIndex)
@@ -62,21 +65,22 @@ class VideoMerge {
             return destTrackIndex
         }
 
-        fun merge( outputFile: String, inputVideoFile: String, inputAudioFile: String ): Boolean {
+        fun merge(context: Context, outputFile: String, inputVideoFile: String, inputAudioUri: Uri ): Boolean {
             var success = false
             val buffer = ByteBuffer.allocate(BUFFER_SIZE)
+            val inputVideoUri = Uri.fromFile(File(inputVideoFile))
 
             try {
                 val muxer = MediaMuxer(outputFile, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
                 var startDestTrackIndex = 0
 
-                addTracks( muxer, inputVideoFile ) { mime -> mime.startsWith(VIDEO_MIME_PREFIX) }
-                addTracks( muxer, inputAudioFile ) { mime -> !mime.startsWith(VIDEO_MIME_PREFIX) }
+                addTracks( muxer, context, inputVideoUri ) { mime -> mime.startsWith(VIDEO_MIME_PREFIX) }
+                addTracks( muxer, context, inputAudioUri ) { mime -> !mime.startsWith(VIDEO_MIME_PREFIX) }
 
                 muxer.start()
 
-                startDestTrackIndex = copyTracks( muxer, inputVideoFile, buffer, startDestTrackIndex ) { mime -> mime.startsWith(VIDEO_MIME_PREFIX) }
-                copyTracks( muxer, inputAudioFile, buffer, startDestTrackIndex ) { mime -> !mime.startsWith(VIDEO_MIME_PREFIX) }
+                startDestTrackIndex = copyTracks( muxer, context, inputVideoUri, buffer, startDestTrackIndex ) { mime -> mime.startsWith(VIDEO_MIME_PREFIX) }
+                copyTracks( muxer, context, inputAudioUri, buffer, startDestTrackIndex ) { mime -> !mime.startsWith(VIDEO_MIME_PREFIX) }
 
                 muxer.stop()
                 muxer.release()

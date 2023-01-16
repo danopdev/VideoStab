@@ -57,8 +57,6 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         get() = "$tmpFolder/tmp_video.mp4"
     private val tmpOutputVideoExists: Boolean
         get() = File(tmpOutputVideo).exists()
-    private val tmpInputVideo: String
-        get() = "$tmpFolder/input.video"
 
     private fun videoPlay() {
         binding.videoOriginal.start()
@@ -243,10 +241,11 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
     private fun saveAsync() {
         var success = false
         val outputPath = getOutputPath()
+        val originalUri = videoUriOriginal ?: return
 
         try {
             if (settings.keepAudio) {
-                VideoMerge.merge(outputPath, tmpOutputVideo, tmpInputVideo)
+                VideoMerge.merge(requireContext(), outputPath, tmpOutputVideo, originalUri)
             } else {
                 val inputStream = File(tmpOutputVideo).inputStream()
                 val outputStream = File(outputPath).outputStream()
@@ -286,34 +285,24 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         return outputFilePath
     }
 
-    private fun copyUriToTempFile() {
-        val videoUri = this.videoUriOriginal ?: throw FileNotFoundException()
-        val inputStream = activity.contentResolver.openInputStream(videoUri) ?: throw FileNotFoundException()
-        val outputStream = File(tmpInputVideo).outputStream()
-        inputStream.copyTo(outputStream)
-        outputStream.close()
-        inputStream.close()
-    }
-
-
-    private fun openVideoCapture( path: String ): VideoCapture {
-        val videoCapture = VideoCapture(path)
+    private fun openVideoCapture( uri: Uri? ): VideoCapture? {
+        if (null == uri) return null
+        val pfd = requireContext().contentResolver.openFileDescriptor(uri, "r") ?: return null
+        val fd = pfd.detachFd()
+        val videoCapture = VideoCapture(":$fd")
+        pfd.close()
+        if (!videoCapture.isOpened) return null
         videoCapture.set( CAP_PROP_ORIENTATION_AUTO, 1.0 )
         return videoCapture
     }
 
 
-    private fun stabAnalyzeAsync( newVideo: Boolean ) {
+    private fun stabAnalyzeAsync() {
         try {
             val useMask = binding.switchUseMask.isEnabled && binding.switchUseMask.isChecked && !firstFrameMask.empty()
             videoProps = null
             videoTrajectory = null
-
-            //OpenCV expects a file path not an URI so copy it
-            if (newVideo) copyUriToTempFile()
-
-            val videoInput = openVideoCapture(tmpInputVideo)
-            if (!videoInput.isOpened) return
+            val videoInput = openVideoCapture(this.videoUriOriginal) ?: return
 
             val trajectoryX = mutableListOf<Double>()
             val trajectoryY = mutableListOf<Double>()
@@ -586,8 +575,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
         val crop = stabGetCrop(transforms, videoProps)
 
-        val videoInput = openVideoCapture(tmpInputVideo)
-        if (!videoInput.isOpened) throw FileNotFoundException()
+        val videoInput = openVideoCapture(this.videoUriOriginal) ?: throw FileNotFoundException()
 
         val videoOutput = VideoEncoder.create(
             tmpOutputVideo,
@@ -654,7 +642,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             updateView()
         }
 
-        runAsync("Prepare") { stabAnalyzeAsync(videoUri != null) }
+        runAsync("Prepare") { stabAnalyzeAsync() }
     }
 
     private fun updateView() {
