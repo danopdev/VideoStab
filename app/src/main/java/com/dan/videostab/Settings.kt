@@ -15,6 +15,8 @@ Settings: all public var fields will be saved
 class Settings( private val activity: Activity) {
 
     companion object {
+        const val WORKING_SIZE = 512
+
         const val VIEW_MODE_ORIGINAL = 0
         const val VIEW_MODE_STABILIZED = 1
         const val VIEW_MODE_SPLIT_HORIZONTAL = 2

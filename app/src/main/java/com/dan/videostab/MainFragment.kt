@@ -315,6 +315,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
             var frameCounter = 0
             val readFrame = Mat()
+            val scaledReadFrame = Mat()
             val frames = listOf( Mat(), Mat() )
             var currentIndex = 0
             var prevIndex = 1
@@ -324,9 +325,17 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             var y = 0.0
             var a = 0.0
 
+            val scaleX = videoWidth.toDouble() / Settings.WORKING_SIZE
+            val scaleY = videoHeight.toDouble() / Settings.WORKING_SIZE
+            val mask = Mat()
+            if (useMask) {
+                resize(firstFrameMask, mask, Size(Settings.WORKING_SIZE.toDouble(), Settings.WORKING_SIZE.toDouble()), 0.0, 0.0, INTER_AREA)
+            }
+
             while(videoInput.read(readFrame)) {
                 if (firstFrame.empty()) firstFrame = readFrame.clone()
-                cvtColor(readFrame, frames[currentIndex], COLOR_BGR2GRAY)
+                resize(readFrame, scaledReadFrame, Size(Settings.WORKING_SIZE.toDouble(), Settings.WORKING_SIZE.toDouble()), 0.0, 0.0, INTER_AREA)
+                cvtColor(scaledReadFrame, frames[currentIndex], COLOR_BGR2GRAY)
 
                 frameCounter++
                 BusyDialog.show("Analyse frame: $frameCounter")
@@ -340,7 +349,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
                         200,
                         0.01,
                         30.0,
-                        if (useMask) firstFrameMask else Mat())
+                        mask)
 
                     // Calculate optical flow (i.e. track feature points)
                     val prevPts2f = MatOfPoint2f()
@@ -384,8 +393,8 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
                         // Extract rotation angle
                         val da = atan2(t.get(1, 0)[0], t.get(0, 0)[0])
 
-                        x += dx
-                        y += dy
+                        x += dx * scaleX
+                        y += dy * scaleY
                         a += da
                     }
                 }
