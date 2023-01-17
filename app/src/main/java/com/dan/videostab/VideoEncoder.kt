@@ -9,6 +9,7 @@ import android.media.MediaMuxer
 import android.view.Surface
 import org.opencv.android.Utils
 import org.opencv.core.Mat
+import org.opencv.core.Range
 
 class VideoEncoder(
     private val frameRate: Int,
@@ -23,14 +24,30 @@ class VideoEncoder(
         private const val MIME_TYPE_H264 = "video/avc"
         private const val MIME_TYPE_H265 = "video/hevc"
 
-        fun create(path: String, frameRate: Int, width: Int, height: Int, h265: Boolean = true): VideoEncoder {
-            val mimeType = if (h265) MIME_TYPE_H265 else MIME_TYPE_H264
+        //ref ranges for 1080p / 30 fps
+        private val BITRATE_REF_H264 = Range(3000000, 6000000)
+        private val BITRATE_REF_H265 = Range(BITRATE_REF_H264.start / 2, BITRATE_REF_H264.end / 2)
 
+        private fun getBitRate(refValue: Int, refRange: Range, width: Int, height: Int, fps: Int): Int {
+            val alpha = (width.toDouble() * height * fps) / (1920.0 * 1080.0 * 30.0)
+            val range = Range( (refRange.start * alpha).toInt(), (refRange.end * alpha).toInt())
+
+            return when {
+                0 == refValue || refValue > range.end -> range.end
+                refValue < range.start -> range.end
+                else -> refValue
+            }
+        }
+
+        fun create(path: String, fps: Int, width: Int, height: Int, bitRate_: Int, h265: Boolean): VideoEncoder {
+            val mimeType = if (h265) MIME_TYPE_H265 else MIME_TYPE_H264
+            val bitRateRange = if (h265) BITRATE_REF_H265 else BITRATE_REF_H264
+            val bitRate = getBitRate(bitRate_, bitRateRange, width, height, fps)
             val format = MediaFormat.createVideoFormat(mimeType, width, height)
 
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-            format.setInteger(MediaFormat.KEY_BIT_RATE, width * height * 5)
-            format.setInteger(MediaFormat.KEY_FRAME_RATE, frameRate)
+            format.setInteger(MediaFormat.KEY_BIT_RATE, bitRate)
+            format.setInteger(MediaFormat.KEY_FRAME_RATE, fps)
             format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 5)
 
             val encoder = MediaCodec.createEncoderByType(mimeType)
@@ -40,7 +57,7 @@ class VideoEncoder(
 
             val muxer = MediaMuxer(path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
 
-            return VideoEncoder(frameRate, width, height, encoder, muxer, surface)
+            return VideoEncoder(fps, width, height, encoder, muxer, surface)
         }
     }
 

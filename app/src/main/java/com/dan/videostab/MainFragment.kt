@@ -425,11 +425,11 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             videoInput.release()
 
             videoProps = VideoProps(
-                    videoWidth,
-                    videoHeight,
-                    videoFrameRate,
-                    videoRotation.toInt(),
-                    frameCounter
+                videoWidth,
+                videoHeight,
+                videoFrameRate,
+                videoRotation.toInt(),
+                frameCounter
             )
 
             videoTrajectory = Trajectory( trajectoryX.toList(), trajectoryY.toList(), trajectoryA.toList() )
@@ -582,6 +582,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             outputFrameRate,
             videoProps.width,
             videoProps.height,
+            0,
             Settings.ENCODER_H265 == settings.encoder
         )
 
