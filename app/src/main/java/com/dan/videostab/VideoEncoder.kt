@@ -20,7 +20,7 @@ class VideoEncoder(
     private val surface: Surface
 ) {
     companion object {
-        private const val TIMEOUT = 1000L
+        private const val TIMEOUT = 100L
         private const val MIME_TYPE_H264 = "video/avc"
         private const val MIME_TYPE_H265 = "video/hevc"
 
@@ -117,6 +117,7 @@ class VideoEncoder(
         surface.unlockCanvasAndPost(canvas)
 
         drainEncoder(false)
+
         frameIndex += 1
     }
 }
