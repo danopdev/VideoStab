@@ -29,7 +29,7 @@ class VideoEncoder(
         private val BITRATE_REF_H265 = Range(BITRATE_REF_H264.start / 2, BITRATE_REF_H264.end / 2)
 
         private fun getBitRate(refValue: Int, refRange: Range, width: Int, height: Int, fps: Int): Int {
-            val alpha = (width.toDouble() * height * fps) / (1920.0 * 1080.0 * 30.0)
+            val alpha = (width.toDouble() * height) / (1920.0 * 1080.0)
             val range = Range( (refRange.start * alpha).toInt(), (refRange.end * alpha).toInt())
 
             return when {
@@ -66,6 +66,7 @@ class VideoEncoder(
     private var frameIndex = 0
     private var open = true
     private var videoTrackIndex = -1
+    private val bufferInfo = MediaCodec.BufferInfo()
 
     val isOpened: Boolean
         get() = open
@@ -73,16 +74,15 @@ class VideoEncoder(
     private fun drainEncoder(end: Boolean) {
         if (end) encoder.signalEndOfInputStream()
 
-        val bufferInfo = MediaCodec.BufferInfo()
-
         while (true) {
             val outBufferId = encoder.dequeueOutputBuffer(bufferInfo, TIMEOUT)
             if (outBufferId >= 0) {
                 val encodedBuffer = encoder.getOutputBuffer(outBufferId) ?: break
-                bufferInfo.presentationTimeUs = frameIndex * 1000000L / frameRate
+                bufferInfo.presentationTimeUs = frameIndex.toLong() * 1000000L / frameRate.toLong()
                 muxer.writeSampleData(videoTrackIndex, encodedBuffer, bufferInfo)
                 encoder.releaseOutputBuffer(outBufferId, false)
                 if ((bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) break
+                if ((bufferInfo.flags and (MediaCodec.BUFFER_FLAG_CODEC_CONFIG or MediaCodec.BUFFER_FLAG_PARTIAL_FRAME)) == 0) frameIndex += 1
             } else if (MediaCodec.INFO_TRY_AGAIN_LATER == outBufferId) {
                 if (!end) break
             } else if (MediaCodec.INFO_OUTPUT_FORMAT_CHANGED == outBufferId) {
@@ -117,7 +117,5 @@ class VideoEncoder(
         surface.unlockCanvasAndPost(canvas)
 
         drainEncoder(false)
-
-        frameIndex += 1
     }
 }
