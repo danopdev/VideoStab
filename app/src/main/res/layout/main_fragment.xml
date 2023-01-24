@@ -22,17 +22,13 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <Switch
-                android:id="@+id/switchUseMask"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Use mask" />
-
-            <ImageButton
+            <Button
                 android:id="@+id/buttonEditMask"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                app:srcCompat="@android:drawable/ic_menu_edit" />
+                android:enabled="false"
+                android:text="Edit Mask"
+                android:textAllCaps="false" />
 
             <TextView
                 android:id="@+id/textView3"

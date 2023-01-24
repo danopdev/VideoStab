@@ -113,14 +113,8 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             handleStabilize()
         }
 
-        binding.switchUseMask.setOnCheckedChangeListener { _, _ ->
-            if (!firstFrame.empty() && !firstFrameMask.empty()) {
-                openVideo()
-            }
-        }
-
         binding.buttonEditMask.setOnClickListener {
-            if (binding.switchUseMask.isEnabled && binding.switchUseMask.isChecked && !firstFrame.empty()) {
+            if (!firstFrame.empty()) {
                 MaskEditFragment.show( activity, firstFrame, firstFrameMask ) {
                     openVideo()
                 }
@@ -299,7 +293,6 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
     private fun stabAnalyzeAsync() {
         try {
-            val useMask = binding.switchUseMask.isEnabled && binding.switchUseMask.isChecked && !firstFrameMask.empty()
             videoProps = null
             videoTrajectory = null
             val videoInput = openVideoCapture(this.videoUriOriginal) ?: return
@@ -324,8 +317,6 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             var y = 0.0
             var a = 0.0
 
-            val mask = if (useMask) firstFrameMask else Mat()
-
             while(videoInput.read(readFrame)) {
                 if (firstFrame.empty()) firstFrame = readFrame.clone()
                 cvtColor(readFrame, frames[currentIndex], COLOR_BGR2GRAY)
@@ -342,7 +333,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
                         200,
                         0.01,
                         30.0,
-                        mask)
+                        firstFrameMask)
 
                     // Calculate optical flow (i.e. track feature points)
                     val prevPts2f = MatOfPoint2f()
@@ -618,7 +609,6 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             videoUriOriginal = videoUri
             videoName = (DocumentFile.fromSingleUri(requireContext(), videoUri)?.name ?: "").split('.')[0]
             binding.videoOriginal.setVideoURI(videoUriOriginal)
-            binding.switchUseMask.isChecked = false
             updateView()
         }
 
@@ -662,10 +652,9 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         binding.play.isEnabled = originalAvailable
         binding.pause.isEnabled = originalAvailable
         binding.stop.isEnabled = originalAvailable
+        binding.buttonEditMask.isEnabled = originalAvailable
 
         val canStabilize = videoTrajectory != null
-        binding.switchUseMask.isEnabled = canStabilize
-        binding.buttonEditMask.isEnabled = canStabilize
         binding.buttonStabilize.isEnabled = canStabilize
         binding.algorithm.isEnabled = canStabilize
         binding.seekBarStrength.isEnabled = canStabilize
