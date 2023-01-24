@@ -137,9 +137,15 @@ class MaskEditFragment(activity: MainActivity, image: Mat, private val mask: Mat
         val channels = mutableListOf<Mat>()
         split(maskMat, channels)
         val maskChannel = channels[0]
+        val maskChannelIsEmpty = 0 == countNonZero(maskChannel)
+        if (maskChannelIsEmpty && mask.empty()) return //nothing to do
 
-        if (mask.empty()) mask.create(maskChannel.rows(), maskChannel.cols(), CvType.CV_8UC1)
-        maskChannel.copyTo(mask)
+        if (maskChannelIsEmpty) {
+            mask.release()
+        } else {
+            if (mask.empty()) mask.create(maskChannel.rows(), maskChannel.cols(), CvType.CV_8UC1)
+            maskChannel.copyTo(mask)
+        }
 
         onOKListener.invoke()
     }

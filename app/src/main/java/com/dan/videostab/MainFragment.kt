@@ -297,18 +297,12 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
     private fun stabAnalyzeAsync() {
         try {
-            videoProps = null
             videoTrajectory = null
             val videoInput = openVideoCapture(this.videoUriOriginal) ?: return
 
             val trajectoryX = mutableListOf<Double>()
             val trajectoryY = mutableListOf<Double>()
             val trajectoryA = mutableListOf<Double>()
-
-            val videoWidth = videoInput.get(CAP_PROP_FRAME_WIDTH).toInt()
-            val videoHeight = videoInput.get(CAP_PROP_FRAME_HEIGHT).toInt()
-            val videoFrameRate = videoInput.get(CAP_PROP_FPS).toInt()
-            val videoRotation = videoInput.get(CAP_PROP_ORIENTATION_META)
 
             var frameCounter = 0
             val readFrame = Mat()
@@ -397,14 +391,6 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             }
 
             videoInput.release()
-
-            videoProps = VideoProps(
-                videoWidth,
-                videoHeight,
-                videoFrameRate,
-                videoRotation.toInt(),
-                frameCounter
-            )
 
             videoTrajectory = Trajectory( trajectoryX.toList(), trajectoryY.toList(), trajectoryA.toList() )
         } catch (e: Exception) {
@@ -569,7 +555,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         val t = Mat(2, 3, CV_64F)
 
         for (index in transforms.x.indices) {
-            BusyDialog.show("Stabilize frame ${index+1} / ${videoProps.frameCount}")
+            BusyDialog.show("Stabilize frame ${index+1}")
 
             if (!videoInput.read(frame)) break
 
@@ -604,14 +590,38 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
     private fun openVideo(videoUri: Uri? = null) {
         videoProps = null
+        videoTrajectory = null
 
         if (null != videoUri) {
             firstFrame = Mat()
             firstFrameMask = Mat()
             TmpFiles(tmpFolder).delete()
-            videoUriOriginal = videoUri
-            videoName = (DocumentFile.fromSingleUri(requireContext(), videoUri)?.name ?: "").split('.')[0]
-            binding.videoOriginal.setVideoURI(videoUriOriginal)
+
+            try {
+                videoName = (DocumentFile.fromSingleUri(requireContext(), videoUri)?.name ?: "").split('.')[0]
+
+                val videoInput = openVideoCapture(videoUri) ?: throw FileNotFoundException()
+
+                val videoWidth = videoInput.get(CAP_PROP_FRAME_WIDTH).toInt()
+                val videoHeight = videoInput.get(CAP_PROP_FRAME_HEIGHT).toInt()
+                val videoFrameRate = videoInput.get(CAP_PROP_FPS).toInt()
+                val frame = Mat()
+                if (!videoInput.read(frame)) throw FileNotFoundException()
+                if (frame.empty()) throw FileNotFoundException()
+                videoInput.release()
+
+
+                firstFrame = frame
+                videoProps = VideoProps(videoWidth, videoHeight, videoFrameRate)
+
+                videoUriOriginal = videoUri
+                binding.videoOriginal.setVideoURI(videoUriOriginal)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                videoUriOriginal = null
+                videoProps = null
+            }
+
             updateView()
         }
     }
