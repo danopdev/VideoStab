@@ -113,10 +113,14 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             handleStabilize()
         }
 
+        binding.buttonAnalyse.setOnClickListener {
+            stabAnalyse()
+        }
+
         binding.buttonEditMask.setOnClickListener {
             if (!firstFrame.empty()) {
                 MaskEditFragment.show( activity, firstFrame, firstFrameMask ) {
-                    openVideo()
+                    stabAnalyse()
                 }
             }
         }
@@ -600,7 +604,6 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
     private fun openVideo(videoUri: Uri? = null) {
         videoProps = null
-        videoTrajectory = null
 
         if (null != videoUri) {
             firstFrame = Mat()
@@ -611,7 +614,10 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             binding.videoOriginal.setVideoURI(videoUriOriginal)
             updateView()
         }
+    }
 
+    private fun stabAnalyse() {
+        videoTrajectory = null
         runAsync("Prepare") { stabAnalyzeAsync() }
     }
 
@@ -660,6 +666,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         binding.seekBarStrength.isEnabled = canStabilize
         binding.crop.isEnabled = canStabilize
         binding.fps.isEnabled = canStabilize
+        binding.buttonAnalyse.isEnabled = originalAvailable && !canStabilize
 
         val videoProps = this.videoProps
         if (null != videoProps) {

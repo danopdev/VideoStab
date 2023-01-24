@@ -23,23 +23,30 @@
             android:orientation="horizontal">
 
             <Button
+                android:id="@+id/buttonAnalyse"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:enabled="false"
+                android:text="Analyse"
+                android:textAllCaps="false" />
+
+            <Button
                 android:id="@+id/buttonEditMask"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginLeft="16dp"
+                android:layout_weight="1"
                 android:enabled="false"
                 android:text="Edit Mask"
                 android:textAllCaps="false" />
-
-            <TextView
-                android:id="@+id/textView3"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_weight="1" />
 
             <Button
                 android:id="@+id/buttonStabilize"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginLeft="16dp"
+                android:layout_weight="1"
                 android:text="Stabilize"
                 android:textAllCaps="false" />
         </LinearLayout>
@@ -173,7 +180,7 @@
                 android:id="@+id/stop"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="10dp"
+                android:layout_marginLeft="16dp"
                 android:layout_weight="1"
                 android:text="Stop"
                 android:textAllCaps="false" />
