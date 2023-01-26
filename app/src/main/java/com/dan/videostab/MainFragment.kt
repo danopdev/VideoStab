@@ -324,12 +324,12 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             var y = 0.0
             var a = 0.0
 
-            framesInput.forEachFrame { _, _, readFrame ->
+            framesInput.forEachFrame { index, size, readFrame ->
                 if (firstFrame.empty()) firstFrame = readFrame.clone()
                 cvtColor(readFrame, frames[currentIndex], COLOR_BGR2GRAY)
 
                 frameCounter++
-                BusyDialog.show("Analyse frame: $frameCounter")
+                BusyDialog.updateProgress(index, size)
 
                 if (!frames[prevIndex].empty()) {
                     // Detect features in previous frame
@@ -560,8 +560,9 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         val frameStabilized = Mat()
         val t = Mat(2, 3, CV_64F)
 
-        framesInput.forEachFrame { index, _, frame ->
-            BusyDialog.show("Stabilize frame ${index+1}")
+        BusyDialog.show("Stabilize")
+        framesInput.forEachFrame { index, size, frame ->
+            BusyDialog.updateProgress(index, size)
 
             transforms.getTransform(index, t)
             warpAffine(frame, frameStabilized, t, frame.size())
@@ -656,7 +657,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
     private fun stabAnalyse() {
         videoTrajectory = null
-        runAsync("Prepare") { stabAnalyzeAsync() }
+        runAsync("Analyse") { stabAnalyzeAsync() }
     }
 
     private fun updateView() {
