@@ -11,7 +11,6 @@ import android.widget.AdapterView
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.net.toUri
-import androidx.documentfile.provider.DocumentFile
 import com.dan.videostab.databinding.MainFragmentBinding
 import kotlinx.coroutines.*
 import org.opencv.calib3d.Calib3d.estimateAffinePartial2D
@@ -19,8 +18,6 @@ import org.opencv.core.*
 import org.opencv.core.CvType.CV_64F
 import org.opencv.imgproc.Imgproc.*
 import org.opencv.video.Video.calcOpticalFlowPyrLK
-import org.opencv.videoio.VideoCapture
-import org.opencv.videoio.Videoio.*
 import java.io.File
 import java.io.FileNotFoundException
 import kotlin.math.atan2
@@ -31,6 +28,8 @@ import kotlin.math.sin
 class MainFragment(activity: MainActivity) : AppFragment(activity) {
     companion object {
         const val INTENT_OPEN_VIDEO = 2
+        const val INTENT_OPEN_IMAGES = 3
+        const val INTENT_OPEN_FOLDER = 4
 
         private fun fixBorder(frame: Mat, crop: Double) {
             val t = getRotationMatrix2D(Point(frame.cols() / 2.0, frame.rows() / 2.0), 0.0, 1.0 + crop)
@@ -43,9 +42,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
     }
 
     private lateinit var binding: MainFragmentBinding
-    private var videoUriOriginal: Uri? = null
-    private var videoName  = ""
-    private var videoProps: VideoProps? = null
+    private var framesInput: FramesInput? = null
     private var videoTrajectory: Trajectory? = null
     private var firstFrame = Mat()
     private var firstFrameMask = Mat()
@@ -61,11 +58,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
     private fun videoPlay() {
         binding.videoOriginal.start()
         binding.videoStabilized.start()
-    }
-
-    private fun videoPause() {
-        binding.videoOriginal.pause()
-        binding.videoStabilized.pause()
+        binding.imagesAsVideoOriginal.play()
     }
 
     private fun videoStop() {
@@ -73,6 +66,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         binding.videoOriginal.seekTo(0)
         binding.videoStabilized.pause()
         binding.videoStabilized.seekTo(0)
+        binding.imagesAsVideoOriginal.stop()
     }
 
     override fun onCreateView(
@@ -97,25 +91,15 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             newMediaPlayer.setVolume(0.0f, 0.0f)
         }
 
-        binding.play.setOnClickListener {
-            videoPlay()
-        }
+        binding.buttonOpenVideo.setOnClickListener { handleOpenVideo() }
+        binding.buttonOpenImages.setOnClickListener { handleOpenImages() }
+        binding.buttonOpenFolder.setOnClickListener { handleOpenFolder() }
 
-        binding.pause.setOnClickListener {
-            videoPause()
-        }
+        binding.play.setOnClickListener { videoPlay() }
+        binding.stop.setOnClickListener { videoStop() }
 
-        binding.stop.setOnClickListener {
-            videoStop()
-        }
-
-        binding.buttonStabilize.setOnClickListener {
-            handleStabilize()
-        }
-
-        binding.buttonAnalyse.setOnClickListener {
-            stabAnalyse()
-        }
+        binding.buttonStabilize.setOnClickListener { handleStabilize() }
+        binding.buttonAnalyse.setOnClickListener { stabAnalyse() }
 
         binding.buttonEditMask.setOnClickListener {
             if (!firstFrame.empty()) {
@@ -176,11 +160,6 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when(item.itemId) {
-            R.id.menuOpen -> {
-                handleOpenVideo()
-                return true
-            }
-
             R.id.menuSave -> {
                 handleSave()
                 settings.algorithm = binding.algorithm.selectedItemPosition
@@ -202,9 +181,28 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, intent: Intent?) {
         if (resultCode == AppCompatActivity.RESULT_OK) {
-            if (requestCode == INTENT_OPEN_VIDEO) {
-                intent?.data?.let { uri -> openVideo(uri) }
-                return
+            when (requestCode) {
+                INTENT_OPEN_VIDEO -> {
+                    intent?.data?.let { uri -> openVideo(uri) }
+                    return
+                }
+
+                INTENT_OPEN_IMAGES -> {
+                    intent?.clipData?.let { clipData ->
+                        val uriList = mutableListOf<Uri>()
+                        val count = clipData.itemCount
+                        for (i in 0 until count) {
+                            uriList.add(clipData.getItemAt(i).uri)
+                        }
+                        openImages(uriList.toList())
+                    }
+                    return
+                }
+
+                INTENT_OPEN_FOLDER -> {
+                    intent?.data?.let { uri -> openFolder(uri) }
+                    return
+                }
             }
         }
 
@@ -224,6 +222,29 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         startActivityForResult(intent, INTENT_OPEN_VIDEO)
     }
 
+    private fun handleOpenImages() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .putExtra("android.content.extra.SHOW_ADVANCED", true)
+            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            .putExtra(Intent.EXTRA_TITLE, "Select images")
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("image/*")
+        @Suppress("DEPRECATION")
+        startActivityForResult(intent, INTENT_OPEN_IMAGES)
+    }
+
+    private fun handleOpenFolder() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+            .putExtra("android.content.extra.SHOW_ADVANCED", true)
+            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false)
+            .putExtra(Intent.EXTRA_TITLE, "Select folder")
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        @Suppress("DEPRECATION")
+        startActivityForResult(intent, INTENT_OPEN_FOLDER)
+    }
+
+
     private fun handleStabilize() {
         runAsync("Stabilize") {
             stabApplyAsync()
@@ -238,12 +259,13 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
     private fun saveAsync() {
         var success = false
-        val outputPath = getOutputPath()
-        val originalUri = videoUriOriginal ?: return
+        val framesInput = this.framesInput ?: return
+        val outputPath = getOutputPath(framesInput)
+        val inputVideoUri = framesInput.videoUri
 
         try {
-            if (settings.keepAudio) {
-                VideoMerge.merge(requireContext(), outputPath, tmpOutputVideo, originalUri)
+            if (null != inputVideoUri && settings.keepAudio) {
+                VideoMerge.merge(requireContext(), outputPath, tmpOutputVideo, inputVideoUri)
             } else {
                 val inputStream = File(tmpOutputVideo).inputStream()
                 val outputStream = File(outputPath).outputStream()
@@ -268,14 +290,14 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         if (!file.exists()) file.mkdirs()
     }
 
-    private fun getOutputPath(): String {
+    private fun getOutputPath(framesInput: FramesInput): String {
         createOutputFolder()
 
         var outputFilePath = ""
         var counter = 0
 
         while(counter < 999) {
-            outputFilePath = Settings.SAVE_FOLDER + "/" + videoName + (if (0 == counter) "" else "_${String.format("%03d", counter)}") + ".mp4"
+            outputFilePath = Settings.SAVE_FOLDER + "/" + framesInput.name + (if (0 == counter) "" else "_${String.format("%03d", counter)}") + ".mp4"
             if (!File(outputFilePath).exists()) break
             counter++
         }
@@ -283,29 +305,16 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         return outputFilePath
     }
 
-    private fun openVideoCapture( uri: Uri? ): VideoCapture? {
-        if (null == uri) return null
-        val pfd = requireContext().contentResolver.openFileDescriptor(uri, "r") ?: return null
-        val fd = pfd.detachFd()
-        val videoCapture = VideoCapture(":$fd")
-        pfd.close()
-        if (!videoCapture.isOpened) return null
-        videoCapture.set( CAP_PROP_ORIENTATION_AUTO, 1.0 )
-        return videoCapture
-    }
-
-
     private fun stabAnalyzeAsync() {
         try {
             videoTrajectory = null
-            val videoInput = openVideoCapture(this.videoUriOriginal) ?: return
+            val framesInput = this.framesInput ?: return
 
             val trajectoryX = mutableListOf<Double>()
             val trajectoryY = mutableListOf<Double>()
             val trajectoryA = mutableListOf<Double>()
 
             var frameCounter = 0
-            val readFrame = Mat()
             val frames = listOf( Mat(), Mat() )
             var currentIndex = 0
             var prevIndex = 1
@@ -315,7 +324,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             var y = 0.0
             var a = 0.0
 
-            while(videoInput.read(readFrame)) {
+            framesInput.forEachFrame { _, _, readFrame ->
                 if (firstFrame.empty()) firstFrame = readFrame.clone()
                 cvtColor(readFrame, frames[currentIndex], COLOR_BGR2GRAY)
 
@@ -388,9 +397,9 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
                 tmpIndex = currentIndex
                 currentIndex = prevIndex
                 prevIndex = tmpIndex
-            }
 
-            videoInput.release()
+                true
+            }
 
             videoTrajectory = Trajectory( trajectoryX.toList(), trajectoryY.toList(), trajectoryA.toList() )
         } catch (e: Exception) {
@@ -398,7 +407,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         }
     }
 
-    private fun stabCalculateAutoCrop( transforms: Trajectory, videoProps: VideoProps ): Double {
+    private fun stabCalculateAutoCrop( transforms: Trajectory, framesInput: FramesInput ): Double {
         var crop = 0.0
 
         for (index in transforms.x.indices) {
@@ -423,12 +432,12 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
                 frameCropBottom = -dy
             }
 
-            val extra = videoProps.height * sin(da)
+            val extra = framesInput.height * sin(da)
             frameCropTop += extra
             frameCropBottom += extra
 
-            val frameCropWidth = max(frameCropLeft, frameCropRight) * 2 / videoProps.width
-            val frameCropHeight = max(frameCropTop, frameCropBottom) * 2 / videoProps.height
+            val frameCropWidth = max(frameCropLeft, frameCropRight) * 2 / framesInput.width
+            val frameCropHeight = max(frameCropTop, frameCropBottom) * 2 / framesInput.height
             val frameCrop = max(frameCropWidth, frameCropHeight)
             crop = max(crop, frameCrop)
         }
@@ -437,26 +446,26 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         return crop
     }
 
-    private fun stabGetCrop( transforms: Trajectory, videoProps: VideoProps ): Double {
+    private fun stabGetCrop( transforms: Trajectory, framesInput: FramesInput ): Double {
         val cropOption = binding.crop.selectedItem as String
         val percentIndex = cropOption.indexOf('%')
         if (percentIndex > 0) return cropOption.substring(0, percentIndex).toInt() / 100.0
-        return stabCalculateAutoCrop(transforms, videoProps)
+        return stabCalculateAutoCrop(transforms, framesInput)
     }
 
     private fun stabApplyAsync() {
         BusyDialog.show("Smooth movements")
 
+        val framesInput = this.framesInput ?: return
         val trajectory = videoTrajectory ?: return
-        val videoProps = this.videoProps ?: return
 
         TmpFiles(tmpFolder).delete("tmp_")
 
-        var outputFrameRate: Int = videoProps.frameRate
+        var outputFrameRate: Int = framesInput.fps
         try {
             outputFrameRate = (binding.fps.selectedItem as String).toInt()
         } catch (e: Exception) {
-            //TODO
+            e.printStackTrace()
         }
 
         val movingAverageWindowSize = outputFrameRate * (binding.seekBarStrength.progress + 1)
@@ -533,15 +542,13 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
                 trajectory.a.delta( newTrajectoryA ),
         )
 
-        val crop = stabGetCrop(transforms, videoProps)
-
-        val videoInput = openVideoCapture(this.videoUriOriginal) ?: throw FileNotFoundException()
+        val crop = stabGetCrop(transforms, framesInput)
 
         val videoOutput = VideoEncoder.create(
             tmpOutputVideo,
             outputFrameRate,
-            videoProps.width,
-            videoProps.height,
+            framesInput.width,
+            framesInput.height,
             0,
             Settings.ENCODER_H265 == settings.encoder
         )
@@ -550,24 +557,22 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             throw FileNotFoundException(tmpOutputVideo)
         }
 
-        val frame = Mat()
         val frameStabilized = Mat()
         val t = Mat(2, 3, CV_64F)
 
-        for (index in transforms.x.indices) {
+        framesInput.forEachFrame { index, _, frame ->
             BusyDialog.show("Stabilize frame ${index+1}")
-
-            if (!videoInput.read(frame)) break
 
             transforms.getTransform(index, t)
             warpAffine(frame, frameStabilized, t, frame.size())
 
             if (crop >= 0.001) fixBorder(frameStabilized, crop)
             videoOutput.write(frameStabilized)
+
+            true
         }
 
         videoOutput.release()
-        videoInput.release()
     }
 
     private fun runAsync(initialMessage: String, asyncTask: () -> Unit) {
@@ -588,42 +593,65 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         }
     }
 
-    private fun openVideo(videoUri: Uri? = null) {
-        videoProps = null
+    private fun setFramesInput(framesInput: FramesInput?) {
+        this.framesInput = framesInput
+
         videoTrajectory = null
+        firstFrame = Mat()
+        firstFrameMask = Mat()
+        TmpFiles(tmpFolder).delete()
 
-        if (null != videoUri) {
-            firstFrame = Mat()
-            firstFrameMask = Mat()
-            TmpFiles(tmpFolder).delete()
-
-            try {
-                videoName = (DocumentFile.fromSingleUri(requireContext(), videoUri)?.name ?: "").split('.')[0]
-
-                val videoInput = openVideoCapture(videoUri) ?: throw FileNotFoundException()
-
-                val videoWidth = videoInput.get(CAP_PROP_FRAME_WIDTH).toInt()
-                val videoHeight = videoInput.get(CAP_PROP_FRAME_HEIGHT).toInt()
-                val videoFrameRate = videoInput.get(CAP_PROP_FPS).toInt()
-                val frame = Mat()
-                if (!videoInput.read(frame)) throw FileNotFoundException()
-                if (frame.empty()) throw FileNotFoundException()
-                videoInput.release()
-
-
-                firstFrame = frame
-                videoProps = VideoProps(videoWidth, videoHeight, videoFrameRate)
-
-                videoUriOriginal = videoUri
-                binding.videoOriginal.setVideoURI(videoUriOriginal)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                videoUriOriginal = null
-                videoProps = null
+        if (null == framesInput) {
+            binding.videoOriginal.setVideoURI(null)
+            binding.videoOriginal.visibility = View.VISIBLE
+            binding.imagesAsVideoOriginal.setImages(null)
+            binding.imagesAsVideoOriginal.visibility = View.GONE
+        } else {
+            val imageUris = framesInput.imageUris
+            if (null == imageUris) {
+                binding.videoOriginal.setVideoURI(framesInput.videoUri)
+                binding.videoOriginal.visibility = View.VISIBLE
+                binding.imagesAsVideoOriginal.setImages(null)
+                binding.imagesAsVideoOriginal.visibility = View.GONE
+            } else {
+                binding.videoOriginal.setVideoURI(null)
+                binding.videoOriginal.visibility = View.GONE
+                binding.imagesAsVideoOriginal.setImages(imageUris, framesInput.fps)
+                binding.imagesAsVideoOriginal.visibility = View.VISIBLE
             }
 
-            updateView()
+            firstFrame = framesInput.firstFrame()
         }
+    }
+
+    private fun openVideo(videoUri: Uri) {
+        try {
+            setFramesInput(VideoFramesInput(requireContext(), videoUri))
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        updateView()
+    }
+
+    private fun openImages(uris: List<Uri>) {
+        try {
+            setFramesInput(ImagesFramesInput(requireContext(), uris))
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        updateView()
+    }
+
+    private fun openFolder(folderUri: Uri) {
+        try {
+            setFramesInput(ImagesFramesInput.fromFolder(requireContext(), folderUri))
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        updateView()
     }
 
     private fun stabAnalyse() {
@@ -664,9 +692,9 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             binding.viewMode.isEnabled = true
         }
 
-        val originalAvailable = null != videoUriOriginal
+        val framesInput = this.framesInput
+        val originalAvailable = null != framesInput
         binding.play.isEnabled = originalAvailable
-        binding.pause.isEnabled = originalAvailable
         binding.stop.isEnabled = originalAvailable
         binding.buttonEditMask.isEnabled = originalAvailable
 
@@ -678,9 +706,8 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         binding.fps.isEnabled = canStabilize
         binding.buttonAnalyse.isEnabled = originalAvailable && !canStabilize
 
-        val videoProps = this.videoProps
-        if (null != videoProps) {
-            binding.info.text = "${videoProps.width} x ${videoProps.height}, fps: ${videoProps.frameRate}, $videoName"
+        if (null != framesInput) {
+            binding.info.text = "${framesInput.width} x ${framesInput.height}, fps: ${framesInput.fps}, ${framesInput.name}"
         } else {
             binding.info.text = ""
         }
