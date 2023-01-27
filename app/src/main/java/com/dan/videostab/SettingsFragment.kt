@@ -17,8 +17,13 @@ class SettingsFragment(activity: MainActivity ) : AppFragment(activity) {
 
     private lateinit var binding: SettingsFragmentBinding
 
+    private fun updateView() {
+        binding.switchEncode265.text = if (binding.switchEncode265.isChecked) "Encoder H265/HEVC" else "Encoder H264 (legacy)"
+        binding.switchKeepAudio.text = if (binding.switchKeepAudio.isChecked) "Keep audio" else "Don't keep audio"
+    }
+
     override fun onBack(homeButton: Boolean) {
-        settings.encoder = binding.videoEncoder.selectedItemPosition
+        settings.encodeH265 = binding.switchEncode265.isChecked
         settings.keepAudio = binding.switchKeepAudio.isChecked
         settings.saveProperties()
     }
@@ -26,8 +31,13 @@ class SettingsFragment(activity: MainActivity ) : AppFragment(activity) {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         binding = SettingsFragmentBinding.inflate( inflater )
 
-        binding.videoEncoder.setSelection(settings.encoder)
+        binding.switchEncode265.isChecked = settings.encodeH265
         binding.switchKeepAudio.isChecked = settings.keepAudio
+
+        binding.switchEncode265.setOnCheckedChangeListener { _, _ -> updateView() }
+        binding.switchKeepAudio.setOnCheckedChangeListener { _, _ -> updateView() }
+
+        updateView()
 
         return binding.root
     }

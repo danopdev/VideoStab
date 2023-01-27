@@ -17,31 +17,20 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <LinearLayout
+                <Switch
+                    android:id="@+id/switchEncode265"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:layout_gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginRight="5dp"
-                        android:text="Video encoder:" />
-
-                    <Spinner
-                        android:id="@+id/videoEncoder"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:entries="@array/video_encoder"
-                        android:spinnerMode="dropdown" />
-                </LinearLayout>
+                    android:layout_height="wrap_content"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"
+                    android:text="H265" />
 
                 <Switch
                     android:id="@+id/switchKeepAudio"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"
                     android:text="Keep audio" />
             </LinearLayout>
         </ScrollView>

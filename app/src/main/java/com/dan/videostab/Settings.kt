@@ -31,9 +31,6 @@ class Settings( private val activity: Activity) {
         const val ALGORITHM_PANNING_B = 8
         const val ALGORITHM_NO_ROTATION = 9
 
-        const val ENCODER_H265 = 0
-        const val ENCODER_H264 = 1
-
         const val MAX_ANALYSE_SIZE = 1920
 
         const val SAVE_FOLDER_SUFFIX = "/VideoStab"
@@ -43,7 +40,7 @@ class Settings( private val activity: Activity) {
     var viewMode: Int = VIEW_MODE_SPLIT_HORIZONTAL
     var algorithm: Int = ALGORITHM_GENERIC
     var strength: Int = 1
-    var encoder: Int = ENCODER_H265
+    var encodeH265 = true
     var keepAudio = false
 
     init {

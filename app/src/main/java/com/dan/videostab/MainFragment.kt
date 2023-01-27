@@ -561,7 +561,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             framesInput.width,
             framesInput.height,
             0,
-            Settings.ENCODER_H265 == settings.encoder
+            settings.encodeH265
         )
 
         if (!videoOutput.isOpened) {
