@@ -34,6 +34,8 @@ class Settings( private val activity: Activity) {
         const val ENCODER_H265 = 0
         const val ENCODER_H264 = 1
 
+        const val MAX_ANALYSE_SIZE = 1920
+
         const val SAVE_FOLDER_SUFFIX = "/VideoStab"
         val SAVE_FOLDER = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES).absolutePath + SAVE_FOLDER_SUFFIX
     }

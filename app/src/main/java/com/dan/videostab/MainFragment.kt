@@ -279,7 +279,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
             success = true
         } catch (e: Exception) {
-            //TODO
+            e.printStackTrace()
         }
 
         showToast(if (success) "Saved: $outputPath" else "Failed !")
@@ -305,6 +305,16 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         return outputFilePath
     }
 
+    private fun scaleForAnalyse(frame: Mat): Double {
+        val maxSize = max(frame.width(), frame.height())
+        if (maxSize < Settings.MAX_ANALYSE_SIZE) return 1.0
+
+        val copyFrame = frame.clone()
+        val scale = maxSize.toDouble() / Settings.MAX_ANALYSE_SIZE
+        resize(copyFrame, frame, Size(copyFrame.width() / scale, copyFrame.height() / scale), 0.0, 0.0, INTER_AREA)
+        return scale
+    }
+
     private fun stabAnalyzeAsync() {
         try {
             videoTrajectory = null
@@ -327,6 +337,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             framesInput.forEachFrame { index, size, readFrame ->
                 if (firstFrame.empty()) firstFrame = readFrame.clone()
                 cvtColor(readFrame, frames[currentIndex], COLOR_BGR2GRAY)
+                val scale = scaleForAnalyse(frames[currentIndex])
 
                 frameCounter++
                 BusyDialog.updateProgress(index, size)
@@ -378,8 +389,8 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
                     // We'll just use the last known good transform.
                     if(!t.empty()) {
                         // Extract translation
-                        val dx = t.get(0, 2)[0]
-                        val dy = t.get(1, 2)[0]
+                        val dx = t.get(0, 2)[0] * scale
+                        val dy = t.get(1, 2)[0] * scale
 
                         // Extract rotation angle
                         val da = atan2(t.get(1, 0)[0], t.get(0, 0)[0])
