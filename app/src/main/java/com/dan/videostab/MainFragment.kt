@@ -27,6 +27,10 @@ import kotlin.math.sin
 
 class MainFragment(activity: MainActivity) : AppFragment(activity) {
     companion object {
+        const val TITLE_ANALYSE = "Analyse"
+        const val TITLE_STABILIZE = "Stabilize"
+        const val TITLE_SAVE = "Save"
+
         const val INTENT_OPEN_VIDEO = 2
         const val INTENT_OPEN_IMAGES = 3
         const val INTENT_OPEN_FOLDER = 4
@@ -246,13 +250,13 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
 
     private fun handleStabilize() {
-        runAsync("Stabilize") {
+        runAsync(TITLE_STABILIZE) {
             stabApplyAsync()
         }
     }
 
     private fun handleSave() {
-        runAsync("Save") {
+        runAsync(TITLE_SAVE) {
             saveAsync()
         }
     }
@@ -335,12 +339,11 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             var a = 0.0
 
             framesInput.forEachFrame { index, size, readFrame ->
-                if (firstFrame.empty()) firstFrame = readFrame.clone()
                 cvtColor(readFrame, frames[currentIndex], COLOR_BGR2GRAY)
                 val scale = scaleForAnalyse(frames[currentIndex])
 
                 frameCounter++
-                BusyDialog.updateProgress(index, size)
+                BusyDialog.show(TITLE_ANALYSE, index, size)
 
                 if (!frames[prevIndex].empty()) {
                     // Detect features in previous frame
@@ -465,8 +468,6 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
     }
 
     private fun stabApplyAsync() {
-        BusyDialog.show("Smooth movements")
-
         val framesInput = this.framesInput ?: return
         val trajectory = videoTrajectory ?: return
 
@@ -571,9 +572,8 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         val frameStabilized = Mat()
         val t = Mat(2, 3, CV_64F)
 
-        BusyDialog.show("Stabilize")
         framesInput.forEachFrame { index, size, frame ->
-            BusyDialog.updateProgress(index, size)
+            BusyDialog.show(TITLE_STABILIZE, index, size)
 
             transforms.getTransform(index, t)
             warpAffine(frame, frameStabilized, t, frame.size())
@@ -633,6 +633,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             }
 
             firstFrame = framesInput.firstFrame()
+            scaleForAnalyse(firstFrame)
         }
     }
 
@@ -668,7 +669,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
     private fun stabAnalyse() {
         videoTrajectory = null
-        runAsync("Analyse") { stabAnalyzeAsync() }
+        runAsync(TITLE_ANALYSE) { stabAnalyzeAsync() }
     }
 
     private fun updateView() {
