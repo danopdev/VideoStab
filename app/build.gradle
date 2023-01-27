@@ -26,8 +26,8 @@ android {
         applicationId "com.dan.videostab"
         minSdkVersion 28
         targetSdkVersion 30
-        versionCode 6
-        versionName '1.6'
+        versionCode 7
+        versionName '1.7'
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -39,8 +39,8 @@ android {
             }
         }
         release {
-            //minifyEnabled true
-            //shrinkResources true
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
