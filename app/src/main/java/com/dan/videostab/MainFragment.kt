@@ -668,7 +668,11 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             binding.viewMode.isEnabled = false
             menuSave?.isEnabled = false
         } else {
-            binding.videoStabilized.setVideoURI(File(tmpOutputVideo).toUri())
+            try {
+                binding.videoStabilized.setVideoURI(File(tmpOutputVideo).toUri())
+            } catch (e: Exception) {
+                binding.videoStabilized.setVideoURI(null)
+            }
             binding.layoutViewMode.visibility = View.VISIBLE
 
             when (binding.viewMode.selectedItemPosition) {
