@@ -31,8 +31,6 @@ class Settings( private val activity: Activity) {
         const val ALGORITHM_PANNING_B = 8
         const val ALGORITHM_NO_ROTATION = 9
 
-        const val MAX_ANALYSE_SIZE = 1920
-
         const val SAVE_FOLDER_SUFFIX = "/VideoStab"
         val SAVE_FOLDER = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES).absolutePath + SAVE_FOLDER_SUFFIX
     }

@@ -310,16 +310,6 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         return outputFilePath
     }
 
-    private fun scaleForAnalyse(frame: Mat): Double {
-        val maxSize = max(frame.width(), frame.height())
-        if (maxSize < Settings.MAX_ANALYSE_SIZE) return 1.0
-
-        val copyFrame = frame.clone()
-        val scale = maxSize.toDouble() / Settings.MAX_ANALYSE_SIZE
-        resize(copyFrame, frame, Size(copyFrame.width() / scale, copyFrame.height() / scale), 0.0, 0.0, INTER_AREA)
-        return scale
-    }
-
     private fun getGoodFeaturesToTrack(frame: Mat, points2f: MatOfPoint2f) {
         val points = MatOfPoint()
 
@@ -334,7 +324,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         points2f.fromList(points.toList())
     }
 
-    private fun calculateTransformation(prevFrame: Mat, prevFramePoints: MatOfPoint2f, newFrame: Mat, scale: Double): Triple<Double, Double, Double> {
+    private fun calculateTransformation(prevFrame: Mat, prevFramePoints: MatOfPoint2f, newFrame: Mat): Triple<Double, Double, Double> {
         // Calculate optical flow (i.e. track feature points)
         val newFramePoints = MatOfPoint2f()
         val status = MatOfByte()
@@ -370,8 +360,8 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         }
 
         // Extract translation
-        val dx = transformation.get(0, 2)[0] * scale
-        val dy = transformation.get(1, 2)[0] * scale
+        val dx = transformation.get(0, 2)[0]
+        val dy = transformation.get(1, 2)[0]
 
         // Extract rotation angle
         val da = atan2(transformation.get(1, 0)[0], transformation.get(0, 0)[0])
@@ -393,8 +383,6 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         framesInput.forEachFrame { index, size, readFrame ->
             BusyDialog.show(TITLE_ANALYSE, index, size)
 
-            val scale = scaleForAnalyse(readFrame)
-
             if (0 == index) {
                 cvtColor(readFrame, firstFrameGray, COLOR_BGR2GRAY)
                 getGoodFeaturesToTrack(firstFrameGray, firstFramePoints)
@@ -403,7 +391,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
                 trajectoryA.add(0.0)
             } else {
                 cvtColor(readFrame, frameGray, COLOR_BGR2GRAY)
-                val deltas = calculateTransformation(firstFrameGray, firstFramePoints, frameGray, scale)
+                val deltas = calculateTransformation(firstFrameGray, firstFramePoints, frameGray)
                 trajectoryX.add(-deltas.first)
                 trajectoryY.add(-deltas.second)
                 trajectoryA.add(-deltas.third)
@@ -435,8 +423,6 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         framesInput.forEachFrame { index, size, readFrame ->
             BusyDialog.show(TITLE_ANALYSE, index, size)
 
-            val scale = scaleForAnalyse(readFrame)
-
             if (0 == index) {
                 cvtColor(readFrame, prevFrameGray, COLOR_BGR2GRAY)
                 trajectoryX.add(0.0)
@@ -447,13 +433,14 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
                 val frameGray = Mat()
                 cvtColor(readFrame, frameGray, COLOR_BGR2GRAY)
-                val deltas = calculateTransformation(prevFrameGray, prevFramePoints, frameGray, scale)
+                val deltas = calculateTransformation(prevFrameGray, prevFramePoints, frameGray)
                 x += deltas.first
                 y += deltas.second
                 a += deltas.third
                 trajectoryX.add(x)
                 trajectoryY.add(y)
                 trajectoryA.add(a)
+                prevFrameGray.release()
                 prevFrameGray = frameGray
             }
 
@@ -688,7 +675,6 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             }
 
             firstFrame = framesInput.firstFrame()
-            scaleForAnalyse(firstFrame)
         }
     }
 
