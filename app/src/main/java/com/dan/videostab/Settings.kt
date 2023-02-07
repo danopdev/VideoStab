@@ -16,11 +16,6 @@ Settings: all public var fields will be saved
 class Settings( private val activity: Activity) {
 
     companion object {
-        const val VIEW_MODE_ORIGINAL = 0
-        const val VIEW_MODE_STABILIZED = 1
-        const val VIEW_MODE_SPLIT_HORIZONTAL = 2
-        const val VIEW_MODE_SPLIT_VERTICAL = 3
-
         const val ALGORITHM_GENERIC = 0
         const val ALGORITHM_GENERIC_B = 1
         const val ALGORITHM_STILL = 2
@@ -35,7 +30,6 @@ class Settings( private val activity: Activity) {
         val SAVE_FOLDER = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "VideoStab")
     }
 
-    var viewMode: Int = VIEW_MODE_SPLIT_HORIZONTAL
     var algorithm: Int = ALGORITHM_GENERIC
     var strength: Int = 1
     var encodeH265 = true

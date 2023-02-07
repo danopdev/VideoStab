@@ -1,11 +1,5 @@
 <resources>
     <string name="app_name">VideoStab</string>
-    <string-array name="view_mode">
-        <item>Original</item>
-        <item>Stabilized</item>
-        <item>Split horizontal</item>
-        <item>Split vertical</item>
-    </string-array>
     <string-array name="algorithm">
         <item>Generic</item>
         <item>Generic (B)</item>

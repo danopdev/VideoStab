@@ -7,10 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Parcelable
 import android.view.*
-import android.widget.AdapterView
-import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.net.toUri
 import com.dan.videostab.databinding.MainFragmentBinding
 import kotlinx.coroutines.*
 import org.opencv.calib3d.Calib3d.estimateAffinePartial2D
@@ -52,6 +49,8 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
     private var firstFrame = Mat()
     private var firstFrameMask = Mat()
     private var menuSave: MenuItem? = null
+    private var outputParams: OutputParams? = null
+    private var maskId: Int = 0
 
     private val tmpFolder: String
         get() = requireContext().cacheDir.absolutePath
@@ -60,18 +59,46 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
     private val tmpOutputVideoExists: Boolean
         get() = File(tmpOutputVideo).exists()
 
-    private fun videoPlay() {
-        binding.videoOriginal.start()
-        binding.videoStabilized.start()
-        binding.imagesAsVideoOriginal.play()
+    private fun videoPlayOriginal() {
+        val framesInput = this.framesInput ?: return
+
+        if (null != framesInput.imageUris) {
+            binding.video.visibility = View.GONE
+            binding.imagesAsVideo.visibility = View.VISIBLE
+            binding.video.setVideoURI(null)
+            binding.imagesAsVideo.setImages(framesInput.imageUris)
+            binding.imagesAsVideo.play()
+            return
+        }
+
+        binding.video.visibility = View.VISIBLE
+        binding.imagesAsVideo.visibility = View.GONE
+        binding.video.setVideoURI(framesInput.videoUri)
+        binding.imagesAsVideo.setImages(null)
+        binding.video.start()
+    }
+
+    private fun videoPlayStabilized(stabilizeIfNeeded: Boolean) {
+        if (null == framesInput) return
+
+        val outputParams = getCurrentOutputParams()
+        val changes = outputParams.compareWith((this.outputParams))
+        if (!tmpOutputVideoExists || OutputParams.COMPARE_NOT_CHANGED != changes) {
+            if (stabilizeIfNeeded) handleStabilize(outputParams)
+            return
+        }
+
+        binding.video.visibility = View.VISIBLE
+        binding.imagesAsVideo.visibility = View.GONE
+        binding.video.setVideoPath(tmpOutputVideo)
+        binding.imagesAsVideo.setImages(null)
+        binding.video.start()
     }
 
     private fun videoStop() {
-        binding.videoOriginal.pause()
-        binding.videoOriginal.seekTo(0)
-        binding.videoStabilized.pause()
-        binding.videoStabilized.seekTo(0)
-        binding.imagesAsVideoOriginal.stop()
+        binding.video.pause()
+        binding.video.seekTo(0)
+        binding.imagesAsVideo.stop()
     }
 
     override fun onCreateView(
@@ -86,42 +113,24 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         binding.algorithm.setSelection(settings.algorithm)
         binding.seekBarStrength.progress = settings.strength
 
-        binding.videoOriginal.setAudioFocusRequest(AudioManager.AUDIOFOCUS_NONE)
-        binding.videoOriginal.setOnPreparedListener { newMediaPlayer ->
-            newMediaPlayer.setVolume(0.0f, 0.0f)
-        }
-
-        binding.videoStabilized.setAudioFocusRequest(AudioManager.AUDIOFOCUS_NONE)
-        binding.videoStabilized.setOnPreparedListener { newMediaPlayer ->
-            newMediaPlayer.setVolume(0.0f, 0.0f)
-        }
+        binding.video.setAudioFocusRequest(AudioManager.AUDIOFOCUS_NONE)
+        binding.video.setOnPreparedListener { newMediaPlayer -> newMediaPlayer.setVolume(0.0f, 0.0f) }
 
         binding.buttonOpenVideo.setOnClickListener { handleOpenVideo() }
         binding.buttonOpenImages.setOnClickListener { handleOpenImages() }
         binding.buttonOpenFolder.setOnClickListener { handleOpenFolder() }
 
-        binding.play.setOnClickListener { videoPlay() }
+        binding.playOriginal.setOnClickListener { videoPlayOriginal() }
+        binding.playStabilized.setOnClickListener { videoPlayStabilized(true) }
         binding.stop.setOnClickListener { videoStop() }
 
-        binding.buttonStabilize.setOnClickListener { handleStabilize() }
-
-        binding.buttonEditMask.setOnClickListener {
+        binding.editMask.setOnClickListener {
             if (!firstFrame.empty()) {
                 MaskEditFragment.show( activity, firstFrame, firstFrameMask ) {
                     videoTrajectory = null
                     videoTrajectoryStill = null
+                    maskId++
                 }
-            }
-        }
-
-        binding.viewMode.setSelection(settings.viewMode)
-
-        binding.viewMode.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>, view: View, position: Int, id: Long) {
-                updateView()
-            }
-
-            override fun onNothingSelected(parent: AdapterView<*>) {
             }
         }
 
@@ -169,7 +178,6 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
                 handleSave()
                 settings.algorithm = binding.algorithm.selectedItemPosition
                 settings.strength = binding.seekBarStrength.progress
-                settings.viewMode = binding.viewMode.selectedItemPosition
                 settings.saveProperties()
                 return true
             }
@@ -250,14 +258,14 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
     }
 
 
-    private fun handleStabilize() {
-        runAsync(TITLE_STABILIZE) {
-            stabApplyAsync()
+    private fun handleStabilize(outputParams: OutputParams) {
+        runAsync(TITLE_STABILIZE, true) {
+            stabApplyAsync(outputParams)
         }
     }
 
     private fun handleSave() {
-        runAsync(TITLE_SAVE) {
+        runAsync(TITLE_SAVE, false) {
             saveAsync()
         }
     }
@@ -493,41 +501,33 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         return stabCalculateAutoCrop(transforms, framesInput)
     }
 
-    private fun stabApplyAsync() {
+    private fun stabApplyAsync(outputParams: OutputParams) {
+        this.outputParams = null
         val framesInput = this.framesInput ?: return
-        var trajectory: Trajectory? = null
 
-        if (Settings.ALGORITHM_STILL == binding.algorithm.selectedItemPosition) {
-            if (null == videoTrajectoryStill) {
-                stabAnalyzeAsyncStill(framesInput)
-                trajectory = videoTrajectoryStill
-            }
+        val algorithm = outputParams.get(OutputParams.KEY_ALGORITHM)
+        var trajectory = if (Settings.ALGORITHM_STILL == algorithm) {
+            if (null == videoTrajectoryStill) stabAnalyzeAsyncStill(framesInput)
+            videoTrajectoryStill
         } else {
-            if (null == videoTrajectory) {
-                stabAnalyzeAsyncMoving(framesInput)
-                trajectory = videoTrajectoryStill
-            }
+            if (null == videoTrajectory) stabAnalyzeAsyncMoving(framesInput)
+            videoTrajectory
         }
 
         if (null == trajectory) return
 
         TmpFiles(tmpFolder).delete("tmp_")
 
-        var outputFrameRate: Int = framesInput.fps
-        try {
-            outputFrameRate = (binding.fps.selectedItem as String).toInt()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        val outputFrameRate = outputParams.get(OutputParams.KEY_FPS)
 
-        if (Settings.ALGORITHM_STILL != binding.algorithm.selectedItemPosition) {
+        if (Settings.ALGORITHM_STILL != algorithm) {
             val movingAverageWindowSize = outputFrameRate * (binding.seekBarStrength.progress + 1)
 
             val newTrajectoryX: List<Double>
             val newTrajectoryY: List<Double>
             val newTrajectoryA: List<Double>
 
-            when (binding.algorithm.selectedItemPosition) {
+            when (algorithm) {
                 Settings.ALGORITHM_GENERIC_B -> {
                     newTrajectoryX = trajectory.x.movingAverage(movingAverageWindowSize)
                     newTrajectoryY = trajectory.y.movingAverage(movingAverageWindowSize)
@@ -621,9 +621,11 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         }
 
         videoOutput.release()
+
+        this.outputParams = outputParams
     }
 
-    private fun runAsync(initialMessage: String, asyncTask: () -> Unit) {
+    private fun runAsync(initialMessage: String, playStabilizedOnFinish: Boolean, asyncTask: () -> Unit) {
         videoStop()
 
         GlobalScope.launch(Dispatchers.Default) {
@@ -637,38 +639,48 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             runOnUiThread {
                 updateView()
                 BusyDialog.dismiss()
+                if (playStabilizedOnFinish) videoPlayStabilized(false)
             }
         }
+    }
+
+    private fun getCurrentOutputParams(): OutputParams {
+        val outputParams = OutputParams()
+
+        outputParams.set(OutputParams.KEY_ALGORITHM, binding.algorithm.selectedItemPosition)
+        outputParams.set(OutputParams.KEY_STRENGTH, if (Settings.ALGORITHM_STILL == binding.algorithm.selectedItemPosition) 0 else binding.seekBarStrength.progress)
+        outputParams.set(OutputParams.KEY_CROP, binding.crop.selectedItemPosition)
+        outputParams.set(OutputParams.KEY_ALIGN, maskId)
+
+        var outputFps: Int = framesInput?.fps ?: 30
+        try {
+            outputFps = (binding.fps.selectedItem as String).toInt()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        outputParams.set(OutputParams.KEY_FPS, outputFps)
+
+        return outputParams
     }
 
     private fun setFramesInput(framesInput: FramesInput?) {
         this.framesInput = framesInput
 
+        maskId = 0
+        outputParams = null
         videoTrajectory = null
         videoTrajectoryStill = null
-        firstFrame = Mat()
-        firstFrameMask = Mat()
+        firstFrame.release()
+        firstFrameMask.release()
         TmpFiles(tmpFolder).delete()
 
-        if (null == framesInput) {
-            binding.videoOriginal.setVideoURI(null)
-            binding.videoOriginal.visibility = View.VISIBLE
-            binding.imagesAsVideoOriginal.setImages(null)
-            binding.imagesAsVideoOriginal.visibility = View.GONE
-        } else {
-            val imageUris = framesInput.imageUris
-            if (null == imageUris) {
-                binding.videoOriginal.setVideoURI(framesInput.videoUri)
-                binding.videoOriginal.visibility = View.VISIBLE
-                binding.imagesAsVideoOriginal.setImages(null)
-                binding.imagesAsVideoOriginal.visibility = View.GONE
-            } else {
-                binding.videoOriginal.setVideoURI(null)
-                binding.videoOriginal.visibility = View.GONE
-                binding.imagesAsVideoOriginal.setImages(imageUris, framesInput.fps)
-                binding.imagesAsVideoOriginal.visibility = View.VISIBLE
-            }
+        binding.video.setVideoURI(null)
+        binding.video.visibility = View.VISIBLE
+        binding.imagesAsVideo.setImages(null)
+        binding.imagesAsVideo.visibility = View.GONE
 
+        if (null != framesInput) {
             firstFrame = framesInput.firstFrame()
         }
     }
@@ -704,57 +716,28 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
     }
 
     private fun updateView() {
-        if (!tmpOutputVideoExists) {
-            binding.videoStabilized.setVideoURI(null)
-            binding.layoutOriginal.visibility = View.VISIBLE
-            binding.layoutStabilized.visibility = View.GONE
-            binding.viewMode.isEnabled = false
-            menuSave?.isEnabled = false
-        } else {
-            try {
-                binding.videoStabilized.setVideoURI(File(tmpOutputVideo).toUri())
-            } catch (e: Exception) {
-                binding.videoStabilized.setVideoURI(null)
-            }
-            binding.layoutViewMode.visibility = View.VISIBLE
-
-            when (binding.viewMode.selectedItemPosition) {
-                Settings.VIEW_MODE_ORIGINAL -> {
-                    binding.layoutOriginal.visibility = View.VISIBLE
-                    binding.layoutStabilized.visibility = View.GONE
-                }
-                Settings.VIEW_MODE_STABILIZED -> {
-                    binding.layoutOriginal.visibility = View.GONE
-                    binding.layoutStabilized.visibility = View.VISIBLE
-                }
-                else -> {
-                    binding.layoutPlayer.orientation =
-                        if (Settings.VIEW_MODE_SPLIT_VERTICAL == binding.viewMode.selectedItemPosition) LinearLayout.VERTICAL
-                        else LinearLayout.HORIZONTAL
-                    binding.layoutOriginal.visibility = View.VISIBLE
-                    binding.layoutStabilized.visibility = View.VISIBLE
-                }
-            }
-
-            menuSave?.isEnabled = true
-            binding.viewMode.isEnabled = true
-        }
-
         val framesInput = this.framesInput
-        val originalAvailable = null != framesInput
-        binding.play.isEnabled = originalAvailable
-        binding.stop.isEnabled = originalAvailable
-        binding.buttonEditMask.isEnabled = originalAvailable
-        binding.buttonStabilize.isEnabled = originalAvailable
-        binding.algorithm.isEnabled = originalAvailable
-        binding.seekBarStrength.isEnabled = originalAvailable
-        binding.crop.isEnabled = originalAvailable
-        binding.fps.isEnabled = originalAvailable
+        val enabled = null != framesInput
 
-        if (null != framesInput) {
-            binding.info.text = "${framesInput.width} x ${framesInput.height}, fps: ${framesInput.fps}, ${framesInput.name}"
-        } else {
+        binding.algorithm.isEnabled = enabled
+        binding.seekBarStrength.isEnabled = enabled
+        binding.crop.isEnabled = enabled
+        binding.fps.isEnabled = enabled
+        binding.playOriginal.isEnabled = enabled
+        binding.playStabilized.isEnabled = enabled
+        binding.stop.isEnabled = enabled
+        binding.editMask.isEnabled = enabled
+
+        menuSave?.isEnabled = tmpOutputVideoExists
+
+        if (null == framesInput) {
+            binding.video.setVideoURI(null)
+            binding.imagesAsVideo.setImages(null)
+            binding.video.visibility = View.VISIBLE
+            binding.imagesAsVideo.visibility = View.GONE
             binding.info.text = ""
+        } else {
+            binding.info.text = "${framesInput.width} x ${framesInput.height}, fps: ${framesInput.fps}, ${framesInput.name}"
         }
     }
 }
