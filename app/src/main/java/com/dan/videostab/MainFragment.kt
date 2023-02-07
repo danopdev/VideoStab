@@ -48,6 +48,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
     private lateinit var binding: MainFragmentBinding
     private var framesInput: FramesInput? = null
     private var videoTrajectory: Trajectory? = null
+    private var videoTrajectoryStill: Trajectory? = null
     private var firstFrame = Mat()
     private var firstFrameMask = Mat()
     private var menuSave: MenuItem? = null
@@ -103,12 +104,12 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         binding.stop.setOnClickListener { videoStop() }
 
         binding.buttonStabilize.setOnClickListener { handleStabilize() }
-        binding.buttonAnalyse.setOnClickListener { stabAnalyse() }
 
         binding.buttonEditMask.setOnClickListener {
             if (!firstFrame.empty()) {
                 MaskEditFragment.show( activity, firstFrame, firstFrameMask ) {
-                    stabAnalyse()
+                    videoTrajectory = null
+                    videoTrajectoryStill = null
                 }
             }
         }
@@ -319,106 +320,149 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         return scale
     }
 
-    private fun stabAnalyzeAsync() {
-        try {
-            videoTrajectory = null
-            val framesInput = this.framesInput ?: return
+    private fun getGoodFeaturesToTrack(frame: Mat, points2f: MatOfPoint2f) {
+        val points = MatOfPoint()
 
-            val trajectoryX = mutableListOf<Double>()
-            val trajectoryY = mutableListOf<Double>()
-            val trajectoryA = mutableListOf<Double>()
+        goodFeaturesToTrack(
+            frame,
+            points,
+            200,
+            0.01,
+            30.0,
+            firstFrameMask)
 
-            var frameCounter = 0
-            val frames = listOf( Mat(), Mat() )
-            var currentIndex = 0
-            var prevIndex = 1
-            var tmpIndex: Int
+        points2f.fromList(points.toList())
+    }
 
-            var x = 0.0
-            var y = 0.0
-            var a = 0.0
+    private fun calculateTransformation(prevFrame: Mat, prevFramePoints: MatOfPoint2f, newFrame: Mat, scale: Double): Triple<Double, Double, Double> {
+        // Calculate optical flow (i.e. track feature points)
+        val newFramePoints = MatOfPoint2f()
+        val status = MatOfByte()
+        val err = MatOfFloat()
+        calcOpticalFlowPyrLK(prevFrame, newFrame, prevFramePoints, newFramePoints, status, err)
 
-            framesInput.forEachFrame { index, size, readFrame ->
-                cvtColor(readFrame, frames[currentIndex], COLOR_BGR2GRAY)
-                val scale = scaleForAnalyse(frames[currentIndex])
+        // Filter only valid points
+        val prevFramePointsList = prevFramePoints.toList()
+        val newFramePointsList = newFramePoints.toList()
+        val statusList = status.toList()
 
-                frameCounter++
-                BusyDialog.show(TITLE_ANALYSE, index, size)
+        val prevFramePointsFilteredList = mutableListOf<Point>()
+        val newFramePointsFilteredList = mutableListOf<Point>()
 
-                if (!frames[prevIndex].empty()) {
-                    // Detect features in previous frame
-                    val prevPts = MatOfPoint()
-                    goodFeaturesToTrack(
-                        frames[prevIndex],
-                        prevPts,
-                        200,
-                        0.01,
-                        30.0,
-                        firstFrameMask)
+        for( i in prevFramePointsList.indices ) {
+            if (0.toByte() != statusList[i]) {
+                prevFramePointsFilteredList.add(prevFramePointsList[i])
+                newFramePointsFilteredList.add(newFramePointsList[i])
+            }
+        }
 
-                    // Calculate optical flow (i.e. track feature points)
-                    val prevPts2f = MatOfPoint2f()
-                    prevPts2f.fromList(prevPts.toList())
-                    val framePts2f = MatOfPoint2f()
-                    val status = MatOfByte()
-                    val err = MatOfFloat()
-                    calcOpticalFlowPyrLK(frames[prevIndex], frames[currentIndex], prevPts2f, framePts2f, status, err)
+        // Find transformation matrix
+        val prevFramePointsMat = MatOfPoint2f()
+        val newFramePointsMat = MatOfPoint2f()
 
-                    // Filter only valid points
-                    val prevPts2fList = prevPts2f.toList()
-                    val framePts2fList = framePts2f.toList()
-                    val statusList = status.toList()
+        prevFramePointsMat.fromList(prevFramePointsFilteredList)
+        newFramePointsMat.fromList(newFramePointsFilteredList)
 
-                    val prevPts2fFilteredList = mutableListOf<Point>()
-                    val framePts2fFilteredList = mutableListOf<Point>()
+        val transformation = estimateAffinePartial2D(prevFramePointsMat, newFramePointsMat)
 
-                    for( i in prevPts2fList.indices ) {
-                        if (0.toByte() != statusList[i]) {
-                            prevPts2fFilteredList.add(prevPts2fList[i])
-                            framePts2fFilteredList.add(framePts2fList[i])
-                        }
-                    }
+        if (transformation.empty()) {
+            return Triple(0.0, 0.0, 0.0)
+        }
 
-                    // Find transformation matrix
-                    val prevPtsMat = MatOfPoint2f()
-                    val framePtsMat = MatOfPoint2f()
+        // Extract translation
+        val dx = transformation.get(0, 2)[0] * scale
+        val dy = transformation.get(1, 2)[0] * scale
 
-                    prevPtsMat.fromList(prevPts2fFilteredList)
-                    framePtsMat.fromList(framePts2fFilteredList)
+        // Extract rotation angle
+        val da = atan2(transformation.get(1, 0)[0], transformation.get(0, 0)[0])
 
-                    val t: Mat = estimateAffinePartial2D(prevPtsMat, framePtsMat)
+        return Triple(dx, dy, da)
+    }
 
-                    // In rare cases no transform is found.
-                    // We'll just use the last known good transform.
-                    if(!t.empty()) {
-                        // Extract translation
-                        val dx = t.get(0, 2)[0] * scale
-                        val dy = t.get(1, 2)[0] * scale
+    private fun stabAnalyzeAsyncStill(framesInput: FramesInput) {
+        videoTrajectoryStill = null
 
-                        // Extract rotation angle
-                        val da = atan2(t.get(1, 0)[0], t.get(0, 0)[0])
+        val trajectoryX = mutableListOf<Double>()
+        val trajectoryY = mutableListOf<Double>()
+        val trajectoryA = mutableListOf<Double>()
 
-                        x += dx
-                        y += dy
-                        a += da
-                    }
-                }
+        val firstFramePoints = MatOfPoint2f()
+        val firstFrameGray = Mat()
+        val frameGray = Mat()
 
+        framesInput.forEachFrame { index, size, readFrame ->
+            BusyDialog.show(TITLE_ANALYSE, index, size)
+
+            val scale = scaleForAnalyse(readFrame)
+
+            if (0 == index) {
+                cvtColor(readFrame, firstFrameGray, COLOR_BGR2GRAY)
+                getGoodFeaturesToTrack(firstFrameGray, firstFramePoints)
+                trajectoryX.add(0.0)
+                trajectoryY.add(0.0)
+                trajectoryA.add(0.0)
+            } else {
+                cvtColor(readFrame, frameGray, COLOR_BGR2GRAY)
+                val deltas = calculateTransformation(firstFrameGray, firstFramePoints, frameGray, scale)
+                trajectoryX.add(-deltas.first)
+                trajectoryY.add(-deltas.second)
+                trajectoryA.add(-deltas.third)
+            }
+
+            true
+        }
+
+        videoTrajectoryStill = Trajectory( trajectoryX.toList(), trajectoryY.toList(), trajectoryA.toList() )
+
+        firstFramePoints.release()
+        firstFrameGray.release()
+        frameGray.release()
+    }
+
+    private fun stabAnalyzeAsyncMoving(framesInput: FramesInput) {
+        videoTrajectory = null
+
+        val trajectoryX = mutableListOf<Double>()
+        val trajectoryY = mutableListOf<Double>()
+        val trajectoryA = mutableListOf<Double>()
+
+        val prevFramePoints = MatOfPoint2f()
+        var prevFrameGray = Mat()
+        var x = 0.0
+        var y = 0.0
+        var a = 0.0
+
+        framesInput.forEachFrame { index, size, readFrame ->
+            BusyDialog.show(TITLE_ANALYSE, index, size)
+
+            val scale = scaleForAnalyse(readFrame)
+
+            if (0 == index) {
+                cvtColor(readFrame, prevFrameGray, COLOR_BGR2GRAY)
+                trajectoryX.add(0.0)
+                trajectoryY.add(0.0)
+                trajectoryA.add(0.0)
+            } else {
+                getGoodFeaturesToTrack(prevFrameGray, prevFramePoints)
+
+                val frameGray = Mat()
+                cvtColor(readFrame, frameGray, COLOR_BGR2GRAY)
+                val deltas = calculateTransformation(prevFrameGray, prevFramePoints, frameGray, scale)
+                x += deltas.first
+                y += deltas.second
+                a += deltas.third
                 trajectoryX.add(x)
                 trajectoryY.add(y)
                 trajectoryA.add(a)
-
-                tmpIndex = currentIndex
-                currentIndex = prevIndex
-                prevIndex = tmpIndex
-
-                true
+                prevFrameGray = frameGray
             }
 
-            videoTrajectory = Trajectory( trajectoryX.toList(), trajectoryY.toList(), trajectoryA.toList() )
-        } catch (e: Exception) {
-            //TODO
+            true
         }
+
+        prevFrameGray.release()
+        prevFramePoints.release()
+        videoTrajectory = Trajectory( trajectoryX.toList(), trajectoryY.toList(), trajectoryA.toList() )
     }
 
     private fun stabCalculateAutoCrop( transforms: Trajectory, framesInput: FramesInput ): Double {
@@ -469,7 +513,21 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
     private fun stabApplyAsync() {
         val framesInput = this.framesInput ?: return
-        val trajectory = videoTrajectory ?: return
+        var trajectory: Trajectory? = null
+
+        if (Settings.ALGORITHM_STILL == binding.algorithm.selectedItemPosition) {
+            if (null == videoTrajectoryStill) {
+                stabAnalyzeAsyncStill(framesInput)
+                trajectory = videoTrajectoryStill
+            }
+        } else {
+            if (null == videoTrajectory) {
+                stabAnalyzeAsyncMoving(framesInput)
+                trajectory = videoTrajectoryStill
+            }
+        }
+
+        if (null == trajectory) return
 
         TmpFiles(tmpFolder).delete("tmp_")
 
@@ -480,81 +538,77 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
             e.printStackTrace()
         }
 
-        val movingAverageWindowSize = outputFrameRate * (binding.seekBarStrength.progress + 1)
+        if (Settings.ALGORITHM_STILL != binding.algorithm.selectedItemPosition) {
+            val movingAverageWindowSize = outputFrameRate * (binding.seekBarStrength.progress + 1)
 
-        val newTrajectoryX: List<Double>
-        val newTrajectoryY: List<Double>
-        val newTrajectoryA: List<Double>
+            val newTrajectoryX: List<Double>
+            val newTrajectoryY: List<Double>
+            val newTrajectoryA: List<Double>
 
-        when(binding.algorithm.selectedItemPosition) {
-            Settings.ALGORITHM_GENERIC_B -> {
-                newTrajectoryX = trajectory.x.movingAverage(movingAverageWindowSize)
-                newTrajectoryY = trajectory.y.movingAverage(movingAverageWindowSize)
-                newTrajectoryA = List(trajectory.size) { 0.0 }
+            when (binding.algorithm.selectedItemPosition) {
+                Settings.ALGORITHM_GENERIC_B -> {
+                    newTrajectoryX = trajectory.x.movingAverage(movingAverageWindowSize)
+                    newTrajectoryY = trajectory.y.movingAverage(movingAverageWindowSize)
+                    newTrajectoryA = List(trajectory.size) { 0.0 }
+                }
+
+                Settings.ALGORITHM_HORIZONTAL_PANNING -> {
+                    newTrajectoryX = trajectory.x.distribute()
+                    newTrajectoryY = List(trajectory.size) { 0.0 }
+                    newTrajectoryA = newTrajectoryY
+                }
+
+                Settings.ALGORITHM_HORIZONTAL_PANNING_B -> {
+                    newTrajectoryX = trajectory.x.distribute()
+                    newTrajectoryY = List(trajectory.size) { 0.0 }
+                    newTrajectoryA = trajectory.a.movingAverage(movingAverageWindowSize)
+                }
+
+                Settings.ALGORITHM_VERTICAL_PANNING -> {
+                    newTrajectoryX = List(trajectory.size) { 0.0 }
+                    newTrajectoryY = trajectory.y.distribute()
+                    newTrajectoryA = newTrajectoryX
+                }
+
+                Settings.ALGORITHM_VERTICAL_PANNING_B -> {
+                    newTrajectoryX = List(trajectory.size) { 0.0 }
+                    newTrajectoryY = trajectory.y.distribute()
+                    newTrajectoryA = trajectory.a.movingAverage(movingAverageWindowSize)
+                }
+
+                Settings.ALGORITHM_PANNING -> {
+                    newTrajectoryX = trajectory.x.distribute()
+                    newTrajectoryY = trajectory.y.distribute()
+                    newTrajectoryA = List(trajectory.size) { 0.0 }
+                }
+
+                Settings.ALGORITHM_PANNING_B -> {
+                    newTrajectoryX = trajectory.x.distribute()
+                    newTrajectoryY = trajectory.y.distribute()
+                    newTrajectoryA = trajectory.a.movingAverage(movingAverageWindowSize)
+                }
+
+                Settings.ALGORITHM_NO_ROTATION -> {
+                    newTrajectoryX = trajectory.x
+                    newTrajectoryY = trajectory.y
+                    newTrajectoryA = List(trajectory.size) { 0.0 }
+                }
+
+                else -> {
+                    newTrajectoryX = trajectory.x.movingAverage(movingAverageWindowSize)
+                    newTrajectoryY = trajectory.y.movingAverage(movingAverageWindowSize)
+                    newTrajectoryA = trajectory.a.movingAverage(movingAverageWindowSize)
+                }
             }
 
-            Settings.ALGORITHM_STILL -> {
-                newTrajectoryX = List(trajectory.size) { 0.0 }
-                newTrajectoryY = newTrajectoryX
-                newTrajectoryA = newTrajectoryX
-            }
-
-            Settings.ALGORITHM_HORIZONTAL_PANNING -> {
-                newTrajectoryX = trajectory.x.distribute()
-                newTrajectoryY = List(trajectory.size) { 0.0 }
-                newTrajectoryA = newTrajectoryY
-            }
-
-            Settings.ALGORITHM_HORIZONTAL_PANNING_B -> {
-                newTrajectoryX = trajectory.x.distribute()
-                newTrajectoryY = List(trajectory.size) { 0.0 }
-                newTrajectoryA = trajectory.a.movingAverage(movingAverageWindowSize)
-            }
-
-            Settings.ALGORITHM_VERTICAL_PANNING -> {
-                newTrajectoryX = List(trajectory.size) { 0.0 }
-                newTrajectoryY = trajectory.y.distribute()
-                newTrajectoryA = newTrajectoryX
-            }
-
-            Settings.ALGORITHM_VERTICAL_PANNING_B -> {
-                newTrajectoryX = List(trajectory.size) { 0.0 }
-                newTrajectoryY = trajectory.y.distribute()
-                newTrajectoryA = trajectory.a.movingAverage(movingAverageWindowSize)
-            }
-
-            Settings.ALGORITHM_PANNING -> {
-                newTrajectoryX = trajectory.x.distribute()
-                newTrajectoryY = trajectory.y.distribute()
-                newTrajectoryA = List(trajectory.size) { 0.0 }
-            }
-
-            Settings.ALGORITHM_PANNING_B -> {
-                newTrajectoryX = trajectory.x.distribute()
-                newTrajectoryY = trajectory.y.distribute()
-                newTrajectoryA = trajectory.a.movingAverage(movingAverageWindowSize)
-            }
-
-            Settings.ALGORITHM_NO_ROTATION -> {
-                newTrajectoryX = trajectory.x
-                newTrajectoryY = trajectory.y
-                newTrajectoryA = List(trajectory.size) { 0.0 }
-            }
-
-            else -> {
-                newTrajectoryX = trajectory.x.movingAverage(movingAverageWindowSize)
-                newTrajectoryY = trajectory.y.movingAverage(movingAverageWindowSize)
-                newTrajectoryA = trajectory.a.movingAverage(movingAverageWindowSize)
-            }
+            trajectory = Trajectory(
+                trajectory.x.delta(newTrajectoryX),
+                trajectory.y.delta(newTrajectoryY),
+                trajectory.a.delta(newTrajectoryA),
+            )
         }
 
-        val transforms = Trajectory(
-                trajectory.x.delta( newTrajectoryX ),
-                trajectory.y.delta( newTrajectoryY ),
-                trajectory.a.delta( newTrajectoryA ),
-        )
-
-        val crop = stabGetCrop(transforms, framesInput)
+        val crop = stabGetCrop(trajectory, framesInput)
 
         val videoOutput = VideoEncoder.create(
             tmpOutputVideo,
@@ -575,7 +629,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         framesInput.forEachFrame { index, size, frame ->
             BusyDialog.show(TITLE_STABILIZE, index, size)
 
-            transforms.getTransform(index, t)
+            trajectory.getTransform(index, t)
             warpAffine(frame, frameStabilized, t, frame.size())
 
             if (crop >= 0.001) fixBorder(frameStabilized, crop)
@@ -609,6 +663,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         this.framesInput = framesInput
 
         videoTrajectory = null
+        videoTrajectoryStill = null
         firstFrame = Mat()
         firstFrameMask = Mat()
         TmpFiles(tmpFolder).delete()
@@ -667,11 +722,6 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         updateView()
     }
 
-    private fun stabAnalyse() {
-        videoTrajectory = null
-        runAsync(TITLE_ANALYSE) { stabAnalyzeAsync() }
-    }
-
     private fun updateView() {
         if (!tmpOutputVideoExists) {
             binding.videoStabilized.setVideoURI(null)
@@ -714,14 +764,11 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         binding.play.isEnabled = originalAvailable
         binding.stop.isEnabled = originalAvailable
         binding.buttonEditMask.isEnabled = originalAvailable
-
-        val canStabilize = videoTrajectory != null
-        binding.buttonStabilize.isEnabled = canStabilize
-        binding.algorithm.isEnabled = canStabilize
-        binding.seekBarStrength.isEnabled = canStabilize
-        binding.crop.isEnabled = canStabilize
-        binding.fps.isEnabled = canStabilize
-        binding.buttonAnalyse.isEnabled = originalAvailable && !canStabilize
+        binding.buttonStabilize.isEnabled = originalAvailable
+        binding.algorithm.isEnabled = originalAvailable
+        binding.seekBarStrength.isEnabled = originalAvailable
+        binding.crop.isEnabled = originalAvailable
+        binding.fps.isEnabled = originalAvailable
 
         if (null != framesInput) {
             binding.info.text = "${framesInput.width} x ${framesInput.height}, fps: ${framesInput.fps}, ${framesInput.name}"

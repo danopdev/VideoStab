@@ -54,44 +54,6 @@
 
     </LinearLayout>
 
-    <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/buttonAnalyse"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:enabled="false"
-                android:text="Analyse"
-                android:textAllCaps="false" />
-
-            <Button
-                android:id="@+id/buttonEditMask"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="16dp"
-                android:layout_weight="1"
-                android:enabled="false"
-                android:text="Edit Mask"
-                android:textAllCaps="false" />
-
-            <Button
-                android:id="@+id/buttonStabilize"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="16dp"
-                android:layout_weight="1"
-                android:text="Stabilize"
-                android:textAllCaps="false" />
-        </LinearLayout>
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -199,23 +161,48 @@
             android:orientation="horizontal">
 
             <Button
-                android:id="@+id/play"
+                android:id="@+id/buttonEditMask"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Play"
-                android:textAllCaps="false" />
+                android:enabled="false"
+                android:textAllCaps="false"
+                app:icon="@android:drawable/ic_menu_edit"
+                app:iconGravity="textEnd" />
+
+            <Button
+                android:id="@+id/buttonStabilize"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="5dp"
+                android:layout_weight="1"
+                android:textAllCaps="false"
+                app:icon="@android:drawable/ic_popup_sync"
+                app:iconGravity="textEnd" />
+
+            <Button
+                android:id="@+id/play"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="5dp"
+                android:layout_weight="1"
+                android:textAllCaps="false"
+                app:icon="@android:drawable/ic_media_play"
+                app:iconGravity="textEnd" />
 
             <Button
                 android:id="@+id/stop"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="16dp"
+                android:layout_marginLeft="5dp"
                 android:layout_weight="1"
-                android:text="Stop"
-                android:textAllCaps="false" />
+                android:textAllCaps="false"
+                app:icon="@android:drawable/ic_media_pause"
+                app:iconGravity="textEnd" />
         </LinearLayout>
 
         <LinearLayout
