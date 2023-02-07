@@ -54,22 +54,21 @@ class VideoFramesInput( private val context: Context, private val _videoUri: Uri
             _height = videoInput.get(CAP_PROP_FRAME_HEIGHT).toInt()
             _size = videoInput.get(CAP_PROP_FRAME_COUNT).toInt()
         }
+
+        if (_size <= 0) _size = VideoTools.countFrames(context, _videoUri)
     }
 
     override fun forEachFrame(callback: (Int, Int, Mat) -> Boolean) {
         var counter = 0
-        var allFrames = true
         withVideoInput { videoInput ->
             val frame = Mat()
             while(videoInput.read(frame)) {
                 if (!callback(counter, _size, frame)) {
-                    allFrames = false
                     break
                 }
                 counter++
             }
         }
-        if (allFrames && counter > _size) _size = counter
     }
 
     private fun withVideoInput(callback: (VideoCapture)->Unit) {
