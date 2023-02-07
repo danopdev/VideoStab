@@ -84,7 +84,13 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         val outputParams = getCurrentOutputParams()
         val changes = outputParams.compareWith((this.outputParams))
         if (!tmpOutputVideoExists || OutputParams.COMPARE_NOT_CHANGED != changes) {
-            if (stabilizeIfNeeded) handleStabilize(outputParams)
+            if (stabilizeIfNeeded) {
+                if (OutputParams.COMPARE_CHANGED_ONLY_FPS == changes) {
+                    changeFps(outputParams)
+                } else {
+                    handleStabilize(outputParams)
+                }
+            }
             return
         }
 
@@ -262,6 +268,12 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         val framesInput = this.framesInput ?: return
         runAsync(TITLE_STABILIZE, framesInput.size, true) {
             stabApplyAsync(outputParams)
+        }
+    }
+
+    private fun changeFps(outputParams: OutputParams) {
+        runAsync(TITLE_STABILIZE, -1, true) {
+            stabChangeFpsAsync(outputParams)
         }
     }
 
@@ -499,6 +511,13 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         if (percentIndex > 0) return cropOption.substring(0, percentIndex).toInt() / 100.0
         return stabCalculateAutoCrop(transforms, framesInput)
     }
+
+    private fun stabChangeFpsAsync(outputParams: OutputParams) {
+        this.outputParams = null
+        VideoTools.changeFps(tmpOutputVideo, outputParams.get(OutputParams.KEY_FPS))
+        if (tmpOutputVideoExists) this.outputParams = outputParams
+    }
+
 
     private fun stabApplyAsync(outputParams: OutputParams) {
         this.outputParams = null
