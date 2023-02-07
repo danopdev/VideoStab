@@ -17,6 +17,7 @@ abstract class FramesInput {
     abstract val height: Int
     abstract val imageUris: List<Uri>?
     abstract val videoUri: Uri?
+    abstract val size: Int
 
     abstract fun forEachFrame(callback: (Int, Int, Mat)->Boolean)
 

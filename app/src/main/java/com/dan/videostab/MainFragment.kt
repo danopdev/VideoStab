@@ -259,13 +259,14 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
 
     private fun handleStabilize(outputParams: OutputParams) {
-        runAsync(TITLE_STABILIZE, true) {
+        val framesInput = this.framesInput ?: return
+        runAsync(TITLE_STABILIZE, framesInput.size, true) {
             stabApplyAsync(outputParams)
         }
     }
 
     private fun handleSave() {
-        runAsync(TITLE_SAVE, false) {
+        runAsync(TITLE_SAVE, -1, false) {
             saveAsync()
         }
     }
@@ -625,12 +626,12 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         this.outputParams = outputParams
     }
 
-    private fun runAsync(initialMessage: String, playStabilizedOnFinish: Boolean, asyncTask: () -> Unit) {
+    private fun runAsync(initialMessage: String, size: Int, playStabilizedOnFinish: Boolean, asyncTask: () -> Unit) {
         videoStop()
 
         GlobalScope.launch(Dispatchers.Default) {
             try {
-                BusyDialog.show(initialMessage)
+                BusyDialog.show(initialMessage, 0, size)
                 asyncTask()
             } catch (e: Exception) {
                 //TODO
