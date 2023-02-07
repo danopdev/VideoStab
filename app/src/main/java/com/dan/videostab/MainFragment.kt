@@ -122,10 +122,6 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         binding.video.setAudioFocusRequest(AudioManager.AUDIOFOCUS_NONE)
         binding.video.setOnPreparedListener { newMediaPlayer -> newMediaPlayer.setVolume(0.0f, 0.0f) }
 
-        binding.buttonOpenVideo.setOnClickListener { handleOpenVideo() }
-        binding.buttonOpenImages.setOnClickListener { handleOpenImages() }
-        binding.buttonOpenFolder.setOnClickListener { handleOpenFolder() }
-
         binding.playOriginal.setOnClickListener { videoPlayOriginal() }
         binding.playStabilized.setOnClickListener { videoPlayStabilized(true) }
         binding.stop.setOnClickListener { videoStop() }
@@ -180,6 +176,21 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when(item.itemId) {
+            R.id.menuOpenVideo -> {
+                handleOpenVideo()
+                return true
+            }
+
+            R.id.menuOpenPhotos -> {
+                handleOpenImages()
+                return true
+            }
+
+            R.id.menuOpenFolder -> {
+                handleOpenFolder()
+                return true
+            }
+
             R.id.menuSave -> {
                 handleSave()
                 settings.algorithm = binding.algorithm.selectedItemPosition
@@ -517,7 +528,6 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         VideoTools.changeFps(tmpOutputVideo, outputParams.get(OutputParams.KEY_FPS))
         if (tmpOutputVideoExists) this.outputParams = outputParams
     }
-
 
     private fun stabApplyAsync(outputParams: OutputParams) {
         this.outputParams = null
