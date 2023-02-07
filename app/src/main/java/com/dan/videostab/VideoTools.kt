@@ -103,10 +103,10 @@ class VideoTools {
                     val trackMime = trackFormat.getString(MediaFormat.KEY_MIME) ?: continue
                     if (!trackMime.startsWith("video/")) continue
                     extractor.selectTrack(trackIndex)
+                    counter++
                     while (extractor.advance()) {
                         counter++
                     }
-                    counter++
                     break
                 }
 

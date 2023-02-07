@@ -429,9 +429,6 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
             if (0 == index) {
                 cvtColor(readFrame, prevFrameGray, COLOR_BGR2GRAY)
-                trajectoryX.add(0.0)
-                trajectoryY.add(0.0)
-                trajectoryA.add(0.0)
             } else {
                 getGoodFeaturesToTrack(prevFrameGray, prevFramePoints)
 
@@ -441,12 +438,13 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
                 x += deltas.first
                 y += deltas.second
                 a += deltas.third
-                trajectoryX.add(x)
-                trajectoryY.add(y)
-                trajectoryA.add(a)
                 prevFrameGray.release()
                 prevFrameGray = frameGray
             }
+
+            trajectoryX.add(x)
+            trajectoryY.add(y)
+            trajectoryA.add(a)
 
             true
         }
@@ -622,6 +620,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         }
 
         videoOutput.release()
+        frameStabilized.release()
 
         this.outputParams = outputParams
     }

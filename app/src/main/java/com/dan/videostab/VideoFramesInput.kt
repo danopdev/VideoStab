@@ -65,7 +65,7 @@ class VideoFramesInput( private val context: Context, private val _videoUri: Uri
         var counter = 0
         withVideoInput { videoInput ->
             val frame = Mat()
-            while(videoInput.read(frame)) {
+            while(counter < _size && videoInput.read(frame)) {
                 if (!callback(counter, _size, frame)) {
                     break
                 }
