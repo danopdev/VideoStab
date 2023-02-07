@@ -65,13 +65,12 @@ class VideoMerge {
             return destTrackIndex
         }
 
-        fun merge(context: Context, outputFile: String, inputVideoFile: String, inputAudioUri: Uri ): Boolean {
+        fun merge(context: Context, outputFile: File, inputVideoUri: Uri, inputAudioUri: Uri ): Boolean {
             var success = false
             val buffer = ByteBuffer.allocate(BUFFER_SIZE)
-            val inputVideoUri = Uri.fromFile(File(inputVideoFile))
 
             try {
-                val muxer = MediaMuxer(outputFile, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+                val muxer = MediaMuxer(outputFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
                 var startDestTrackIndex = 0
 
                 addTracks( muxer, context, inputVideoUri ) { mime -> mime.startsWith(VIDEO_MIME_PREFIX) }

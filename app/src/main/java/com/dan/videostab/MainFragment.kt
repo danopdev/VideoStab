@@ -265,49 +265,44 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
     private fun saveAsync() {
         var success = false
         val framesInput = this.framesInput ?: return
-        val outputPath = getOutputPath(framesInput)
+        val outputFile = getOutputFile(framesInput)
         val inputVideoUri = framesInput.videoUri
 
         try {
             if (null != inputVideoUri && settings.keepAudio) {
-                VideoMerge.merge(requireContext(), outputPath, tmpOutputVideo, inputVideoUri)
+                VideoMerge.merge(requireContext(), outputFile, Uri.fromFile(File(tmpOutputVideo)), inputVideoUri)
             } else {
                 val inputStream = File(tmpOutputVideo).inputStream()
-                val outputStream = File(outputPath).outputStream()
+                val outputStream = outputFile.outputStream()
                 inputStream.copyTo(outputStream)
                 inputStream.close()
                 outputStream.close()
             }
 
             //Add it to gallery
-            MediaScannerConnection.scanFile(context, arrayOf(outputPath), null, null)
+            MediaScannerConnection.scanFile(context, arrayOf(outputFile.absolutePath), null, null)
 
             success = true
         } catch (e: Exception) {
             e.printStackTrace()
         }
 
-        showToast(if (success) "Saved: $outputPath" else "Failed !")
+        showToast(if (success) "Saved: ${outputFile.absolutePath}" else "Failed !")
     }
 
     private fun createOutputFolder() {
-        val file = File(Settings.SAVE_FOLDER)
-        if (!file.exists()) file.mkdirs()
+        if (!Settings.SAVE_FOLDER.exists()) Settings.SAVE_FOLDER.mkdirs()
     }
 
-    private fun getOutputPath(framesInput: FramesInput): String {
+    private fun getOutputFile(framesInput: FramesInput): File {
         createOutputFolder()
 
-        var outputFilePath = ""
         var counter = 0
-
-        while(counter < 999) {
-            outputFilePath = Settings.SAVE_FOLDER + "/" + framesInput.name + (if (0 == counter) "" else "_${String.format("%03d", counter)}") + ".mp4"
-            if (!File(outputFilePath).exists()) break
+        while(true) {
+            val outputFile = File(Settings.SAVE_FOLDER, framesInput.name + (if (0 == counter) "" else "_${String.format("%03d", counter)}") + ".mp4")
+            if (counter >= 999 || !outputFile.exists()) return outputFile
             counter++
         }
-
-        return outputFilePath
     }
 
     private fun getGoodFeaturesToTrack(frame: Mat, points2f: MatOfPoint2f) {

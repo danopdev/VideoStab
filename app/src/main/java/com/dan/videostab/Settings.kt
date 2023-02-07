@@ -4,6 +4,7 @@ package com.dan.videostab
 import android.app.Activity
 import android.content.Context
 import android.os.Environment
+import java.io.File
 import kotlin.reflect.KMutableProperty
 import kotlin.reflect.KVisibility
 import kotlin.reflect.full.createType
@@ -31,8 +32,7 @@ class Settings( private val activity: Activity) {
         const val ALGORITHM_PANNING_B = 8
         const val ALGORITHM_NO_ROTATION = 9
 
-        const val SAVE_FOLDER_SUFFIX = "/VideoStab"
-        val SAVE_FOLDER = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES).absolutePath + SAVE_FOLDER_SUFFIX
+        val SAVE_FOLDER = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "VideoStab")
     }
 
     var viewMode: Int = VIEW_MODE_SPLIT_HORIZONTAL
