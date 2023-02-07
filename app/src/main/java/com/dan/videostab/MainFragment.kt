@@ -270,7 +270,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
         try {
             if (null != inputVideoUri && settings.keepAudio) {
-                VideoMerge.merge(requireContext(), outputFile, Uri.fromFile(File(tmpOutputVideo)), inputVideoUri)
+                VideoTools.combineVideoAndAudio(requireContext(), outputFile, Uri.fromFile(File(tmpOutputVideo)), inputVideoUri)
             } else {
                 val inputStream = File(tmpOutputVideo).inputStream()
                 val outputStream = outputFile.outputStream()

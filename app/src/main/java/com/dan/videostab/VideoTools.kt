@@ -10,7 +10,7 @@ import android.net.Uri
 import java.io.File
 import java.nio.ByteBuffer
 
-class VideoMerge {
+class VideoTools {
     companion object {
         private const val BUFFER_SIZE = 1024 * 1024 //1 MB
         private const val VIDEO_MIME_PREFIX = "video/"
@@ -65,7 +65,7 @@ class VideoMerge {
             return destTrackIndex
         }
 
-        fun merge(context: Context, outputFile: File, inputVideoUri: Uri, inputAudioUri: Uri ): Boolean {
+        fun combineVideoAndAudio(context: Context, outputFile: File, inputVideoUri: Uri, inputAudioUri: Uri ): Boolean {
             var success = false
             val buffer = ByteBuffer.allocate(BUFFER_SIZE)
 
