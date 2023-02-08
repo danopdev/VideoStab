@@ -34,7 +34,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
 
         private fun fixBorder(frame: Mat, crop: Double) {
             val t = getRotationMatrix2D(Point(frame.cols() / 2.0, frame.rows() / 2.0), 0.0, 1.0 + crop)
-            warpAffine(frame, frame, t, frame.size())
+            warpAffine(frame, frame, t, frame.size(), INTER_LANCZOS4)
         }
 
         fun show(activity: MainActivity) {
@@ -661,7 +661,7 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
                 false
             } else {
                 trajectory.getTransform(index, t)
-                warpAffine(frame, frameStabilized, t, frame.size())
+                warpAffine(frame, frameStabilized, t, frame.size(), INTER_LANCZOS4)
 
                 if (crop >= 0.001) fixBorder(frameStabilized, crop)
                 videoOutput.write(frameStabilized)
