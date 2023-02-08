@@ -407,27 +407,36 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         val firstFrameGray = Mat()
         val frameGray = Mat()
 
+        BusyDialog.showCancel()
+
         framesInput.forEachFrame { index, size, readFrame ->
             BusyDialog.show(TITLE_ANALYSE, index, size)
 
-            if (0 == index) {
-                cvtColor(readFrame, firstFrameGray, COLOR_BGR2GRAY)
-                getGoodFeaturesToTrack(firstFrameGray, firstFramePoints)
-                trajectoryX.add(0.0)
-                trajectoryY.add(0.0)
-                trajectoryA.add(0.0)
+            if (BusyDialog.isCanceled()) {
+                false
             } else {
-                cvtColor(readFrame, frameGray, COLOR_BGR2GRAY)
-                val deltas = calculateTransformation(firstFrameGray, firstFramePoints, frameGray)
-                trajectoryX.add(-deltas.first)
-                trajectoryY.add(-deltas.second)
-                trajectoryA.add(-deltas.third)
-            }
+                if (0 == index) {
+                    cvtColor(readFrame, firstFrameGray, COLOR_BGR2GRAY)
+                    getGoodFeaturesToTrack(firstFrameGray, firstFramePoints)
+                    trajectoryX.add(0.0)
+                    trajectoryY.add(0.0)
+                    trajectoryA.add(0.0)
+                } else {
+                    cvtColor(readFrame, frameGray, COLOR_BGR2GRAY)
+                    val deltas =
+                        calculateTransformation(firstFrameGray, firstFramePoints, frameGray)
+                    trajectoryX.add(-deltas.first)
+                    trajectoryY.add(-deltas.second)
+                    trajectoryA.add(-deltas.third)
+                }
 
-            true
+                true
+            }
         }
 
-        videoTrajectoryStill = Trajectory( trajectoryX.toList(), trajectoryY.toList(), trajectoryA.toList() )
+        if (!BusyDialog.isCanceled()) {
+            videoTrajectoryStill = Trajectory(trajectoryX.toList(), trajectoryY.toList(), trajectoryA.toList())
+        }
 
         firstFramePoints.release()
         firstFrameGray.release()
@@ -447,34 +456,43 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         var y = 0.0
         var a = 0.0
 
+        BusyDialog.showCancel()
+
         framesInput.forEachFrame { index, size, readFrame ->
             BusyDialog.show(TITLE_ANALYSE, index, size)
 
-            if (0 == index) {
-                cvtColor(readFrame, prevFrameGray, COLOR_BGR2GRAY)
+            if (BusyDialog.isCanceled()) {
+                false
             } else {
-                getGoodFeaturesToTrack(prevFrameGray, prevFramePoints)
+                if (0 == index) {
+                    cvtColor(readFrame, prevFrameGray, COLOR_BGR2GRAY)
+                } else {
+                    getGoodFeaturesToTrack(prevFrameGray, prevFramePoints)
 
-                val frameGray = Mat()
-                cvtColor(readFrame, frameGray, COLOR_BGR2GRAY)
-                val deltas = calculateTransformation(prevFrameGray, prevFramePoints, frameGray)
-                x += deltas.first
-                y += deltas.second
-                a += deltas.third
-                prevFrameGray.release()
-                prevFrameGray = frameGray
+                    val frameGray = Mat()
+                    cvtColor(readFrame, frameGray, COLOR_BGR2GRAY)
+                    val deltas = calculateTransformation(prevFrameGray, prevFramePoints, frameGray)
+                    x += deltas.first
+                    y += deltas.second
+                    a += deltas.third
+                    prevFrameGray.release()
+                    prevFrameGray = frameGray
+                }
+
+                trajectoryX.add(x)
+                trajectoryY.add(y)
+                trajectoryA.add(a)
+
+                true
             }
-
-            trajectoryX.add(x)
-            trajectoryY.add(y)
-            trajectoryA.add(a)
-
-            true
         }
 
         prevFrameGray.release()
         prevFramePoints.release()
-        videoTrajectory = Trajectory( trajectoryX.toList(), trajectoryY.toList(), trajectoryA.toList() )
+
+        if(!BusyDialog.isCanceled()) {
+            videoTrajectory = Trajectory(trajectoryX.toList(), trajectoryY.toList(), trajectoryA.toList())
+        }
     }
 
     private fun stabCalculateAutoCrop( transforms: Trajectory, framesInput: FramesInput ): Double {
@@ -636,22 +654,30 @@ class MainFragment(activity: MainActivity) : AppFragment(activity) {
         val frameStabilized = Mat()
         val t = Mat(2, 3, CV_64F)
 
+        BusyDialog.showCancel()
         framesInput.forEachFrame { index, size, frame ->
             BusyDialog.show(TITLE_STABILIZE, index, size)
+            if (BusyDialog.isCanceled()) {
+                false
+            } else {
+                trajectory.getTransform(index, t)
+                warpAffine(frame, frameStabilized, t, frame.size())
 
-            trajectory.getTransform(index, t)
-            warpAffine(frame, frameStabilized, t, frame.size())
+                if (crop >= 0.001) fixBorder(frameStabilized, crop)
+                videoOutput.write(frameStabilized)
 
-            if (crop >= 0.001) fixBorder(frameStabilized, crop)
-            videoOutput.write(frameStabilized)
-
-            true
+                true
+            }
         }
 
         videoOutput.release()
         frameStabilized.release()
 
-        this.outputParams = outputParams
+        if (BusyDialog.isCanceled()) {
+            File(tmpOutputVideo).delete()
+        } else {
+            this.outputParams = outputParams
+        }
     }
 
     private fun runAsync(initialMessage: String, size: Int, playStabilizedOnFinish: Boolean, asyncTask: () -> Unit) {
