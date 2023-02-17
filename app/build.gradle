@@ -26,7 +26,7 @@ android {
         applicationId "com.dan.videostab"
         minSdkVersion 28
         targetSdkVersion 30
-        versionCode 7
+        versionCode 8
         versionName '1.7'
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
